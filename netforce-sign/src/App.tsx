@@ -72,6 +72,11 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
   const [current, setCurrent] = useState<outlook.MailAttachment | null>(null);
   const [signedDocs, setSignedDocs] = useState<Record<string, SignedAttachment>>({});
   const restoreRef = useRef<{ zones: Zone[]; placements: Placement[] } | null>(null);
+  /** Pièces jointes qu'Outlook n'a pas pu transmettre (mobile) et fichiers choisis à la main pour les remplacer. */
+  const [unreadable, setUnreadable] = useState<Record<string, true>>({});
+  const manualSources = useRef<Record<string, ArrayBuffer>>({});
+  const pickFor = useRef<outlook.MailAttachment | null>(null);
+  const attachInput = useRef<HTMLInputElement>(null);
   const [modal, setModal] = useState<{ kind: Kind; pending: Pending } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -402,21 +407,43 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
   const exportAs = (format: 'pdf' | 'docx') => runExport(format, (f) => downloadBlob(f.bytes, f.name, f.mime));
 
   /* ---------- Outlook ---------- */
+  const openWithBytes = async (a: outlook.MailAttachment, bytes: ArrayBuffer) => {
+    const prev = signedDocs[a.id];
+    restoreRef.current = prev ? { zones: prev.zones, placements: prev.placements } : null;
+    setCurrent(a);
+    await openFile(new File([bytes], a.name, { type: a.kind === 'pdf' ? 'application/pdf' : DOCX_MIME }));
+  };
+
   const openAttachment = async (a: outlook.MailAttachment) => {
+    const manual = manualSources.current[a.id];
+    if (manual) return openWithBytes(a, manual);
     try {
       setBusy('Ouverture…');
-      const bytes = await outlook.readAttachment(a.id);
-      const prev = signedDocs[a.id];
-      restoreRef.current = prev ? { zones: prev.zones, placements: prev.placements } : null;
-      setCurrent(a);
-      await openFile(new File([bytes], a.name, { type: a.kind === 'pdf' ? 'application/pdf' : DOCX_MIME }));
+      await openWithBytes(a, await outlook.readAttachment(a.id));
     } catch (e) {
       console.error(e);
       restoreRef.current = null;
       setCurrent(null);
       setBusy(null);
-      setToast(`Pièce jointe illisible — ${(e as Error)?.message ?? e} (${outlook.describeHost()})`);
+      setUnreadable((u) => ({ ...u, [a.id]: true }));
+      setToast(`Outlook n’a pas transmis ce fichier — ${(e as Error)?.message ?? e}`);
     }
+  };
+
+  /** Plan B mobile : l'utilisateur choisit le fichier enregistré depuis Outlook. */
+  const pickManually = (a: outlook.MailAttachment) => {
+    pickFor.current = a;
+    attachInput.current?.click();
+  };
+
+  const onManualFile = async (file: File) => {
+    const a = pickFor.current;
+    pickFor.current = null;
+    if (!a) return;
+    const bytes = await file.arrayBuffer();
+    manualSources.current[a.id] = bytes;
+    setUnreadable(({ [a.id]: _done, ...rest }) => rest);
+    await openWithBytes(a, bytes);
   };
 
   const backToList = () => {
@@ -519,6 +546,8 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
           off = outlook.onItemChanged(() => {
             backToList();
             setSignedDocs({});
+            setUnreadable({});
+            manualSources.current = {};
             const next = load();
             if (next?.length === 1) openAttachment(next[0]);
           });
@@ -695,19 +724,40 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
                 {mail?.attachments.map((a) => {
                   const done = !!signedDocs[a.id];
                   return (
-                    <button key={a.id} className={`mail-file ${done ? 'done' : ''}`} onClick={() => openAttachment(a)}>
-                      <IconFile width={18} height={18} />
-                      <span>{a.name}</span>
-                      {done ? (
-                        <em className="status ok">
-                          <IconCheck width={14} height={14} /> Signé
-                        </em>
-                      ) : (
-                        <em className="status">À signer</em>
+                    <div key={a.id} className="mail-entry">
+                      <button className={`mail-file ${done ? 'done' : ''}`} onClick={() => openAttachment(a)}>
+                        <IconFile width={18} height={18} />
+                        <span>{a.name}</span>
+                        {done ? (
+                          <em className="status ok">
+                            <IconCheck width={14} height={14} /> Signé
+                          </em>
+                        ) : (
+                          <em className="status">À signer</em>
+                        )}
+                      </button>
+                      {unreadable[a.id] && !done && (
+                        <div className="mail-fallback">
+                          <span>Enregistrez la pièce jointe depuis Outlook, puis choisissez-la ici.</span>
+                          <button className="btn outline small" onClick={() => pickManually(a)}>
+                            <IconUpload width={14} height={14} /> Choisir le fichier
+                          </button>
+                        </div>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
+                <input
+                  ref={attachInput}
+                  type="file"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  hidden
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) onManualFile(f);
+                    e.target.value = '';
+                  }}
+                />
               </div>
             ) : (
               <button className={`dropzone ${dragOver ? 'over' : ''}`} onClick={() => fileInput.current?.click()}>
