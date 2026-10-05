@@ -1005,6 +1005,10 @@ button:disabled {
   max-height: 100%;
 }
 
+.modal-error {
+  margin-top: 12px;
+}
+
 .current {
   display: flex;
   align-items: center;
