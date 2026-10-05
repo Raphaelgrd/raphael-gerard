@@ -263,6 +263,62 @@ button:disabled {
   margin-top: 14px;
 }
 
+/* Outlook : pièces jointes du message */
+.mail-files {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.mail-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  text-align: left;
+  font-weight: 600;
+}
+
+.mail-file:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.mail-file svg {
+  color: var(--accent);
+  flex: none;
+}
+
+.mail-file span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mail-file small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.dropzone.compact {
+  padding: 16px;
+  flex-direction: row;
+  justify-content: center;
+}
+
+.reply-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
 /* ---------- Espace de travail ---------- */
 
 .workspace {

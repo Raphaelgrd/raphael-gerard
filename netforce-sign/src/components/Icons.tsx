@@ -53,3 +53,6 @@ export const IconChevron = (p: P) => (
 export const IconTarget = (p: P) => (
   <svg {...base(p)}><rect x="4" y="7" width="16" height="10" rx="1.5" strokeDasharray="3 2.5" /><path d="M8 13h5" /></svg>
 );
+export const IconReply = (p: P) => (
+  <svg {...base(p)}><path d="M10 9 5 13l5 4" /><path d="M5 13h9a5 5 0 0 1 5 5v1" /></svg>
+);

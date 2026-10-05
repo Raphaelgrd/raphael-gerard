@@ -6,6 +6,8 @@ Les documents sont traités **dans le navigateur** : ils ne sont jamais envoyés
 
 **Mise en ligne pour l'équipe : voir [DEPLOIEMENT.md](DEPLOIEMENT.md).**
 
+**Bouton « Signer » dans Outlook : voir [OUTLOOK.md](OUTLOOK.md).**
+
 ## Fonctionnalités
 
 - **Import** : PDF et Word `.docx`, par sélection de fichier ou glisser-déposer.
