@@ -24,12 +24,44 @@ let ready: Promise<boolean> | null = null;
 export function outlookReady(): Promise<boolean> {
   if (!inOutlookPane || !officeLoaded()) return Promise.resolve(false);
   ready ??= new Promise((resolve) => {
+    let done = false;
+    const finish = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      clearInterval(poll);
+      resolve(ok);
+    };
     Office.onReady((info) => {
       // Certaines versions mobiles renseignent mal `host` : la présence d'une boîte mail suffit.
-      resolve(info.host === Office.HostType.Outlook || !!Office.context?.mailbox);
+      finish(info.host === Office.HostType.Outlook || !!Office.context?.mailbox);
     });
+    // Secours : le message est disponible mais Office.onReady n'a pas été appelé.
+    const poll = setInterval(() => {
+      try {
+        if (Office.context?.mailbox?.item) finish(true);
+      } catch {
+        /* contexte pas encore prêt */
+      }
+    }, 500);
   });
   return ready;
+}
+
+/** Informations techniques pour diagnostiquer un volet qui ne démarre pas. */
+export function diagnostics(): string[] {
+  const out: string[] = [];
+  try {
+    out.push(`Office.js : ${typeof Office === 'undefined' ? 'absent' : 'chargé'}`);
+    if (typeof Office !== 'undefined') {
+      out.push(`context : ${Office.context ? 'oui' : 'non'} · mailbox : ${Office.context?.mailbox ? 'oui' : 'non'} · item : ${Office.context?.mailbox?.item ? 'oui' : 'non'}`);
+    }
+  } catch (e) {
+    out.push(`Office.js : ${(e as Error).message}`);
+  }
+  out.push(`URL : ${window.location.pathname}${window.location.search.slice(0, 120)}`);
+  out.push(`Navigateur : ${navigator.userAgent.slice(0, 160)}`);
+  const log = (window as unknown as { __nfDiag?: string[] }).__nfDiag ?? [];
+  return out.concat(log);
 }
 
 /** Description courte de l'environnement Outlook, affichée en cas de problème. */

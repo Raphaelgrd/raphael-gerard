@@ -653,9 +653,19 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
                     <div className="spinner small" />
                     <span>Connexion à Outlook…</span>
                     {mailSlow && (
-                      <button className="btn outline small" onClick={() => window.location.reload()}>
-                        Réessayer
-                      </button>
+                      <>
+                        <button className="btn outline small" onClick={() => window.location.reload()}>
+                          Réessayer
+                        </button>
+                        <details className="ol-diag" open>
+                          <summary>Détails techniques</summary>
+                          <ul>
+                            {outlook.diagnostics().map((d, i) => (
+                              <li key={i}>{d}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      </>
                     )}
                   </div>
                 )}
