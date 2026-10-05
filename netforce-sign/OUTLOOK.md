@@ -61,3 +61,37 @@ Le volet peut être épinglé (punaise) : il reste ouvert et suit le mail sélec
 | « Version d'Outlook trop ancienne » | Mettre Outlook à jour, ou utiliser Outlook sur le web |
 | Les boutons **Répondre** sont absents | Outlook ne permet pas encore de joindre un fichier depuis un complément : télécharger le document signé et le joindre à la main |
 | Le volet reste blanc | Vérifier que l'adresse du manifeste correspond bien au site en ligne (étape 1) |
+
+---
+
+## Outlook mobile : activer Microsoft Graph (même parcours que sur PC)
+
+Outlook iPhone / Android ne permet pas toujours à un complément de lire une pièce jointe (erreur 3001) ni de joindre un fichier à une réponse.
+Netforce Sign passe alors par **Microsoft Graph**, l'accès officiel à la boîte mail : la pièce jointe est lue directement, et la réponse est créée avec les documents signés puis envoyée depuis le volet.
+Il faut pour cela enregistrer l'application une fois auprès de Microsoft.
+
+### 1. Enregistrer l'application (10 minutes)
+
+1. Ouvrez https://entra.microsoft.com (compte administrateur Microsoft 365 de Netforce ; pour un essai avec un compte Outlook.com, https://portal.azure.com fonctionne aussi).
+2. **Applications** → **Inscriptions d'applications** → **Nouvelle inscription** :
+   - Nom : `Netforce Sign`
+   - Types de comptes : **Comptes dans un annuaire d'organisation et comptes Microsoft personnels**
+   - URI de redirection : plateforme **Application monopage (SPA)**, valeur `brk-multihub://raphael-gerard.vercel.app`
+   - **S'inscrire**.
+3. Dans l'application créée → **Authentification** → **Ajouter un URI** (toujours SPA) : `https://raphael-gerard.vercel.app/taskpane.html` → **Enregistrer**.
+4. **API autorisées** → **Ajouter une autorisation** → **Microsoft Graph** → **Autorisations déléguées** → cochez `Mail.ReadWrite` et `Mail.Send` → **Ajouter**.
+   Avec le compte administrateur Netforce : cliquez ensuite **Accorder un consentement d'administrateur** (personne n'aura de question à la première utilisation).
+5. Onglet **Vue d'ensemble** : copiez l'**ID d'application (client)**.
+
+Remplacez `raphael-gerard.vercel.app` par votre domaine si vous en utilisez un autre.
+
+### 2. Le donner à l'app
+
+Vercel → projet → **Settings** → **Environment Variables** → ajoutez `VITE_MS_CLIENT_ID` = l'ID copié → **Save**, puis **Deployments** → **Redeploy**.
+
+### Fonctionnement
+
+- Sur PC, rien ne change : Outlook fournit tout lui-même.
+- Sur mobile, si Outlook refuse la lecture d'une pièce jointe, l'app la récupère par Graph sans rien demander.
+- **Répondre** / **Répondre à tous** ouvre une fenêtre pour écrire un message ; **Envoyer** crée la réponse dans la conversation, y joint les documents signés (y compris les gros fichiers) et l'envoie. La réponse apparaît dans les éléments envoyés comme une réponse normale.
+- À la première utilisation, Microsoft peut demander de confirmer l'accès à la boîte mail.

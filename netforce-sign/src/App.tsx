@@ -6,6 +6,7 @@ import { loadAsset, saveAsset } from './lib/assets';
 import { fetchAssets, frError, logSignature, saveCloudAsset, sha256, updateFullName, type Profile } from './lib/cloud';
 import HistoryModal from './components/HistoryModal';
 import * as outlook from './lib/outlook';
+import * as graph from './lib/graph';
 import { baseName, downloadBlob, nextFrame, placementAt, placementFromZone } from './lib/util';
 import AssetModal from './components/AssetModal';
 import Brand from './components/Brand';
@@ -25,6 +26,7 @@ import {
   IconUndo,
   IconReply,
   IconBack,
+  IconX,
   IconUpload,
 } from './components/Icons';
 
@@ -77,6 +79,9 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
   const manualSources = useRef<Record<string, ArrayBuffer>>({});
   const pickFor = useRef<outlook.MailAttachment | null>(null);
   const attachInput = useRef<HTMLInputElement>(null);
+  /** Outlook a déjà refusé une lecture : on passe directement par Microsoft Graph. */
+  const officeReadBroken = useRef(false);
+  const [compose, setCompose] = useState<{ replyAll: boolean; comment: string } | null>(null);
   const [modal, setModal] = useState<{ kind: Kind; pending: Pending } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -419,7 +424,20 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
     if (manual) return openWithBytes(a, manual);
     try {
       setBusy('Ouverture…');
-      await openWithBytes(a, await outlook.readAttachment(a.id));
+      let bytes: ArrayBuffer;
+      if (graph.graphConfigured && officeReadBroken.current) {
+        bytes = await graph.readAttachmentViaGraph(a);
+      } else {
+        try {
+          bytes = await outlook.readAttachment(a.id);
+        } catch (officeError) {
+          if (!graph.graphConfigured) throw officeError;
+          // Outlook mobile : la lecture native échoue (erreur 3001), Graph prend le relais.
+          officeReadBroken.current = true;
+          bytes = await graph.readAttachmentViaGraph(a);
+        }
+      }
+      await openWithBytes(a, bytes);
     } catch (e) {
       console.error(e);
       restoreRef.current = null;
@@ -491,6 +509,26 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
     } catch (e) {
       console.error(e);
       setToast('Réponse impossible');
+    }
+  };
+
+  /** Outlook mobile : réponse envoyée par Microsoft Graph, avec un message saisi dans le volet. */
+  const sendViaGraph = async () => {
+    if (!compose || !signedList.length) return;
+    setBusy('Envoi de la réponse…');
+    try {
+      await graph.replyViaGraph(
+        signedList.map((a) => signedDocs[a.id].file),
+        { replyAll: compose.replyAll, comment: compose.comment.trim() },
+      );
+      setCompose(null);
+      setSignedDocs({});
+      setToast('Réponse envoyée');
+    } catch (e) {
+      console.error(e);
+      setToast(`Envoi impossible — ${(e as Error)?.message ?? e}`);
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -773,12 +811,20 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
           </div>
           {inOutlook && mail && mail.attachments.length > 0 && (
             <div className="ol-bar">
-              {mail.canReply ? (
+              {mail.canReply || graph.graphConfigured ? (
                 <>
-                  <button className="btn primary" onClick={() => replyWithSigned(false)} disabled={!signedList.length}>
+                  <button
+                    className="btn primary"
+                    onClick={() => (mail.canReply ? replyWithSigned(false) : setCompose({ replyAll: false, comment: '' }))}
+                    disabled={!signedList.length}
+                  >
                     <IconReply width={16} height={16} /> Répondre{signedList.length ? ` (${signedList.length})` : ''}
                   </button>
-                  <button className="btn outline" onClick={() => replyWithSigned(true)} disabled={!signedList.length}>
+                  <button
+                    className="btn outline"
+                    onClick={() => (mail.canReply ? replyWithSigned(true) : setCompose({ replyAll: true, comment: '' }))}
+                    disabled={!signedList.length}
+                  >
                     Répondre à tous
                   </button>
                 </>
@@ -929,6 +975,43 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
       )}
 
       {toast && <div className="toast">{toast}</div>}
+
+      {compose && (
+        <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && setCompose(null)}>
+          <div className="modal" role="dialog" aria-modal="true" aria-label="Réponse">
+            <div className="modal-head">
+              <h2>{compose.replyAll ? 'Répondre à tous' : 'Répondre'}</h2>
+              <button className="icon-btn" onClick={() => setCompose(null)} aria-label="Fermer">
+                <IconX />
+              </button>
+            </div>
+            <div className="modal-body">
+              <textarea
+                className="field compose-text"
+                placeholder="Message (facultatif)"
+                value={compose.comment}
+                autoFocus
+                onChange={(e) => setCompose({ ...compose, comment: e.target.value })}
+              />
+              <ul className="compose-files">
+                {signedList.map((a) => (
+                  <li key={a.id}>
+                    <IconFile width={16} height={16} /> {signedDocs[a.id].file.name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="modal-foot">
+              <button className="btn ghost" onClick={() => setCompose(null)}>
+                Annuler
+              </button>
+              <button className="btn primary" onClick={sendViaGraph} disabled={!!busy}>
+                <IconReply width={16} height={16} /> Envoyer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {historyOpen && <HistoryModal isAdmin={!!cloud && cloud.profile.role === 'admin'} onClose={() => setHistoryOpen(false)} />}
 
