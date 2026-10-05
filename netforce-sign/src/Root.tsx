@@ -23,7 +23,7 @@ function CloudRoot() {
     });
     // Retire les jetons de l'URL une fois lus.
     if (window.location.hash.includes('access_token') || window.location.hash.includes('error')) {
-      history.replaceState(null, '', window.location.pathname + window.location.search);
+      history.replaceState?.(null, '', window.location.pathname + window.location.search);
     }
     return () => data.subscription.unsubscribe();
   }, []);

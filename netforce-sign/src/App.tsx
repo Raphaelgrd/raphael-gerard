@@ -5,6 +5,7 @@ import type { Asset, Kind, LoadedDoc, PageSize, Placement, Zone } from './types'
 import { loadAsset, saveAsset } from './lib/assets';
 import { fetchAssets, frError, logSignature, saveCloudAsset, sha256, updateFullName, type Profile } from './lib/cloud';
 import HistoryModal from './components/HistoryModal';
+import * as outlook from './lib/outlook';
 import { baseName, downloadBlob, nextFrame, placementAt, placementFromZone } from './lib/util';
 import AssetModal from './components/AssetModal';
 import Brand from './components/Brand';
@@ -22,6 +23,7 @@ import {
   IconStamp,
   IconTarget,
   IconUndo,
+  IconReply,
   IconUpload,
 } from './components/Icons';
 
@@ -37,7 +39,7 @@ export interface CloudContext {
 
 const NO_STAMP = 'Cachet non défini (admin)';
 
-export default function App({ cloud }: { cloud: CloudContext | null }) {
+export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { cloud: CloudContext | null; inOutlook?: boolean }) {
   const ns = cloud?.profile.id;
   const isAdmin = !cloud || cloud.profile.role === 'admin';
   /** Le cachet est commun à l'entreprise : seuls les administrateurs le modifient. */
@@ -57,6 +59,7 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
   }));
   const [menuOpen, setMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [mail, setMail] = useState<{ attachments: outlook.MailAttachment[]; canReply: boolean; error?: string } | null>(null);
   const [modal, setModal] = useState<{ kind: Kind; pending: Pending } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -316,7 +319,42 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
   }, [modal, selectedId, placements, sizes, undo, onDelete, onChange]);
 
   /* ---------- Export ---------- */
-  const exportAs = async (format: 'pdf' | 'docx') => {
+  /** Produit le document signé (sans le télécharger). */
+  const buildSigned = async (format: 'pdf' | 'docx'): Promise<{ bytes: Uint8Array; name: string; mime: string }> => {
+    const d = doc!;
+    const name = `${baseName(d.name)}_signe.${format}`;
+    const mime = format === 'pdf' ? 'application/pdf' : DOCX_MIME;
+    const toBytes = async (b: Blob | Uint8Array) => (b instanceof Blob ? new Uint8Array(await b.arrayBuffer()) : b);
+    if (d.kind === 'pdf') {
+      const lib = await import('./lib/pdf');
+      if (format === 'pdf') return { bytes: await lib.exportPdf(d.bytes, placements), name, mime };
+      const { docxFromImages } = await import('./lib/docx');
+      return { bytes: await toBytes(await docxFromImages(await lib.rasterizePdf(pdf!, placements))), name, mime };
+    }
+    const lib = await import('./lib/docx');
+    if (format === 'docx') return { bytes: await toBytes(await lib.exportDocx(d.bytes, placements, sections)), name, mime };
+    return { bytes: await lib.exportPdfFromDocx(sections, docxHost.current!), name, mime };
+  };
+
+  const logExport = (format: 'pdf' | 'docx') => {
+    if (!cloud || !doc) return;
+    const d = doc;
+    sha256(d.bytes)
+      .then((hash) =>
+        logSignature({
+          document_name: d.name.slice(0, 300),
+          document_kind: d.kind,
+          export_format: format,
+          document_sha256: hash,
+          page_count: sizes.length,
+          signature_count: placements.filter((p) => p.kind === 'signature').length,
+          stamp_count: placements.filter((p) => p.kind === 'stamp').length,
+        }),
+      )
+      .catch((e) => console.warn('Historique non enregistré', e));
+  };
+
+  const runExport = async (format: 'pdf' | 'docx', deliver: (file: { bytes: Uint8Array; name: string; mime: string }) => Promise<void> | void) => {
     if (!doc) return;
     setSelectedId(null);
     setArmed(null);
@@ -325,39 +363,8 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
     document.body.classList.add('nf-exporting');
     await nextFrame();
     try {
-      const name = `${baseName(doc.name)}_signe.${format}`;
-      if (doc.kind === 'pdf') {
-        const lib = await import('./lib/pdf');
-        if (format === 'pdf') {
-          downloadBlob(await lib.exportPdf(doc.bytes, placements), name, 'application/pdf');
-        } else {
-          const { docxFromImages } = await import('./lib/docx');
-          const pages = await lib.rasterizePdf(pdf!, placements);
-          downloadBlob(await docxFromImages(pages), name, DOCX_MIME);
-        }
-      } else {
-        const lib = await import('./lib/docx');
-        if (format === 'docx') {
-          downloadBlob(await lib.exportDocx(doc.bytes, placements, sections), name, DOCX_MIME);
-        } else {
-          downloadBlob(await lib.exportPdfFromDocx(sections, docxHost.current!), name, 'application/pdf');
-        }
-      }
-      if (cloud) {
-        sha256(doc.bytes)
-          .then((hash) =>
-            logSignature({
-              document_name: doc.name.slice(0, 300),
-              document_kind: doc.kind,
-              export_format: format,
-              document_sha256: hash,
-              page_count: sizes.length,
-              signature_count: placements.filter((p) => p.kind === 'signature').length,
-              stamp_count: placements.filter((p) => p.kind === 'stamp').length,
-            }),
-          )
-          .catch((e) => console.warn('Historique non enregistré', e));
-      }
+      await deliver(await buildSigned(format));
+      logExport(format);
     } catch (e) {
       console.error(e);
       setToast('Échec de l’export');
@@ -366,6 +373,52 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
       setBusy(null);
     }
   };
+
+  const exportAs = (format: 'pdf' | 'docx') => runExport(format, (f) => downloadBlob(f.bytes, f.name, f.mime));
+
+  /** Outlook : répondre au message avec le document signé, dans son format d'origine. */
+  const replySigned = (replyAll: boolean) =>
+    runExport(doc!.kind, (f) => outlook.replyWithFile(f.name, f.bytes, replyAll));
+
+  /* ---------- Outlook ---------- */
+  const openAttachment = async (a: outlook.MailAttachment) => {
+    try {
+      setBusy('Ouverture…');
+      const bytes = await outlook.readAttachment(a.id);
+      await openFile(new File([bytes], a.name, { type: a.kind === 'pdf' ? 'application/pdf' : DOCX_MIME }));
+    } catch (e) {
+      console.error(e);
+      setBusy(null);
+      setToast('Pièce jointe illisible');
+    }
+  };
+
+  useEffect(() => {
+    if (!inOutlook) return;
+    let off = () => undefined as void;
+    const load = () => {
+      if (!outlook.canReadAttachments()) {
+        setMail({ attachments: [], canReply: false, error: 'Version d’Outlook trop ancienne' });
+        return;
+      }
+      const attachments = outlook.listAttachments();
+      setMail({ attachments, canReply: outlook.canReplyWithFile() });
+      return attachments;
+    };
+    outlook.outlookReady().then((ok) => {
+      if (!ok) return;
+      const first = load();
+      if (first?.length === 1) openAttachment(first[0]);
+      off = outlook.onItemChanged(() => {
+        setDoc(null);
+        reset();
+        const next = load();
+        if (next?.length === 1) openAttachment(next[0]);
+      });
+    });
+    return () => off();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inOutlook]);
 
   /* ---------- Rendu ---------- */
   const overlay = (page: number) =>
@@ -484,7 +537,20 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
       {!doc ? (
         <main className="landing">
           <div className="landing-inner">
-            <button className={`dropzone ${dragOver ? 'over' : ''}`} onClick={() => fileInput.current?.click()}>
+            {inOutlook && mail && (
+              <div className="mail-files">
+                {mail.error && <p className="form-error">{mail.error}</p>}
+                {!mail.error && mail.attachments.length === 0 && <p className="muted center">Aucun PDF ou Word dans ce mail</p>}
+                {mail.attachments.map((a) => (
+                  <button key={a.id} className="mail-file" onClick={() => openAttachment(a)}>
+                    <IconFile width={18} height={18} />
+                    <span>{a.name}</span>
+                    <small>{Math.max(1, Math.round(a.size / 1024))} Ko</small>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button className={`dropzone ${dragOver ? 'over' : ''} ${inOutlook ? 'compact' : ''}`} onClick={() => fileInput.current?.click()}>
               <IconUpload width={26} height={26} />
               <strong>Ouvrir un document</strong>
               <span>PDF · Word</span>
@@ -576,6 +642,16 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
               </section>
 
               <section className="export">
+                {inOutlook && mail?.canReply && (
+                  <div className="reply-row">
+                    <button className="btn primary" onClick={() => replySigned(false)} disabled={!!busy}>
+                      <IconReply width={16} height={16} /> Répondre
+                    </button>
+                    <button className="btn outline" onClick={() => replySigned(true)} disabled={!!busy}>
+                      Répondre à tous
+                    </button>
+                  </div>
+                )}
                 <h3>Télécharger</h3>
                 <div className="export-row">
                   <button className="btn primary" onClick={() => exportAs('pdf')} disabled={!!busy}>
@@ -585,7 +661,15 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
                     <IconDownload width={16} height={16} /> Word
                   </button>
                 </div>
-                <button className="btn outline small" onClick={() => fileInput.current?.click()}>
+                <button
+                  className="btn outline small"
+                  onClick={() => {
+                    if (inOutlook) {
+                      setDoc(null);
+                      reset();
+                    } else fileInput.current?.click();
+                  }}
+                >
                   Autre document
                 </button>
               </section>
