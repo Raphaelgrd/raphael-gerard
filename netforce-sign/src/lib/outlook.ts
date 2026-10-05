@@ -106,19 +106,44 @@ export function listAttachments(): MailAttachment[] {
     .filter((a): a is MailAttachment => a.kind !== null);
 }
 
-export function readAttachment(id: string): Promise<ArrayBuffer> {
+function readOnce(id: string): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
     const item = mailbox().item as Office.MessageRead;
     item.getAttachmentContentAsync(id, (res) => {
-      if (res.status !== Office.AsyncResultStatus.Succeeded) return reject(new Error(res.error?.message ?? 'Pièce jointe illisible'));
+      if (res.status !== Office.AsyncResultStatus.Succeeded) {
+        const err = res.error as (Office.Error & { code?: number | string }) | undefined;
+        return reject(new Error(`${err?.name ?? 'Erreur'}${err?.code !== undefined ? ` ${err.code}` : ''} : ${err?.message ?? 'inconnue'}`));
+      }
       const { content, format } = res.value;
-      if (format !== Office.MailboxEnums.AttachmentContentFormat.Base64) return reject(new Error('Format de pièce jointe non pris en charge'));
+      const fmt = String(format).toLowerCase();
+      if (fmt === 'url') {
+        // Pièce jointe transmise sous forme de lien (pièce jointe cloud, certaines versions mobiles).
+        fetch(content)
+          .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`Téléchargement ${r.status}`))))
+          .then(resolve, reject);
+        return;
+      }
+      if (fmt !== 'base64') return reject(new Error(`Format non pris en charge : ${format}`));
       const bin = atob(content);
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       resolve(bytes.buffer);
     });
   });
+}
+
+/** Contenu d'une pièce jointe ; un second essai couvre un message pas encore entièrement chargé (mobile). */
+export async function readAttachment(id: string): Promise<ArrayBuffer> {
+  try {
+    return await readOnce(id);
+  } catch (first) {
+    await new Promise((r) => setTimeout(r, 1200));
+    try {
+      return await readOnce(id);
+    } catch {
+      throw first;
+    }
+  }
 }
 
 function toBase64(bytes: Uint8Array): string {
