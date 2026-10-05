@@ -87,7 +87,7 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
         (['signature', 'stamp'] as Kind[]).forEach((k) => saveAsset(k, remote[k], cloud.profile.id));
         setAssets(remote);
       })
-      .catch(() => alive && setToast('Hors ligne'));
+      .catch((e) => alive && setToast(`Signature et cachet non chargés : ${frError(e)}`));
     return () => {
       alive = false;
     };
@@ -260,15 +260,14 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
     [snapshot],
   );
 
-  const onSaveAsset = (asset: Asset) => {
+  /** Enregistre l'image ; en mode compte, l'échec en ligne est remonté à la fenêtre (qui reste ouverte). */
+  const onSaveAsset = async (asset: Asset) => {
     if (!modal) return;
     const kind = modal.kind;
+    if (cloud) await saveCloudAsset(kind, asset);
     const nextAssets = { ...assets, [kind]: asset };
     setAssets(nextAssets);
     saveAsset(kind, asset, ns);
-    if (cloud) {
-      saveCloudAsset(kind, asset).catch((e) => setToast(`Non enregistré : ${frError(e)}`));
-    }
     // Les éléments déjà posés adoptent la nouvelle version.
     setPlacements((cur) =>
       cur.map((p) => {

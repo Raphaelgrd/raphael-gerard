@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { Asset, Kind } from '../types';
 import SignaturePad, { type SignaturePadHandle } from './SignaturePad';
 import { imageFileToAsset } from '../lib/assets';
+import { frError } from '../lib/cloud';
 import { IconUpload, IconX } from './Icons';
 
 interface Props {
   kind: Kind;
   current: Asset | null;
-  onSave: (asset: Asset) => void;
+  onSave: (asset: Asset) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -45,9 +46,21 @@ export default function AssetModal({ kind, current, onSave, onClose }: Props) {
     };
   }, [importFile, removeBg]);
 
-  const save = () => {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async () => {
     const asset = tab === 'draw' ? pad.current?.toAsset() ?? null : imported;
-    if (asset) onSave(asset);
+    if (!asset) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(asset);
+    } catch (e) {
+      setError(frError(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const canSave = tab === 'draw' ? !padEmpty : !!imported;
@@ -125,6 +138,8 @@ export default function AssetModal({ kind, current, onSave, onClose }: Props) {
             </div>
           )}
 
+          {error && <p className="form-error modal-error">Non enregistré : {error}</p>}
+
           {current && (
             <div className="current">
               <span>Actuel</span>
@@ -137,8 +152,8 @@ export default function AssetModal({ kind, current, onSave, onClose }: Props) {
           <button className="btn ghost" onClick={onClose}>
             Annuler
           </button>
-          <button className="btn primary" onClick={save} disabled={!canSave}>
-            Enregistrer
+          <button className="btn primary" onClick={save} disabled={!canSave || saving}>
+            {saving ? 'Enregistrement…' : 'Enregistrer'}
           </button>
         </div>
       </div>

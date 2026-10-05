@@ -60,7 +60,7 @@ export async function imageFileToAsset(file: File, removeBackground: boolean): P
   const url = URL.createObjectURL(file);
   try {
     const img = await loadImage(url);
-    const max = 1600;
+    const max = 1200;
     const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
     const c = document.createElement('canvas');
     c.width = Math.round(img.naturalWidth * scale);

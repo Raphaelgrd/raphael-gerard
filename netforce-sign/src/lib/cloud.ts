@@ -56,6 +56,10 @@ export function frError(e: unknown): string {
   if (/rate limit|too many/i.test(msg)) return 'Trop de tentatives. Patientez quelques minutes.';
   if (/failed to fetch|network/i.test(msg)) return 'Connexion impossible. Vérifiez votre réseau.';
   if (/row-level security|permission denied/i.test(msg)) return "Action non autorisée pour votre compte.";
+  if (/does not exist|could not find the (function|table)|schema cache|PGRST20[02]|42P01|42883/i.test(msg))
+    return 'Base de données non configurée : exécutez le script SQL dans Supabase (SQL Editor).';
+  if (/check constraint|too large|payload|413/i.test(msg)) return 'Image trop lourde : utilisez une image plus petite.';
+  if (/jwt|not authenticated|401/i.test(msg)) return 'Session expirée : déconnectez-vous puis reconnectez-vous.';
   return msg;
 }
 
