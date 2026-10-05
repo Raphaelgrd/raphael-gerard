@@ -25,10 +25,12 @@ export function outlookReady(): Promise<boolean> {
   if (!inOutlookPane || !officeLoaded()) return Promise.resolve(false);
   ready ??= new Promise((resolve) => {
     let done = false;
+    // Déclaré avant onReady : sur iOS, Outlook peut appeler le rappel immédiatement.
+    let poll: ReturnType<typeof setInterval> | undefined;
     const finish = (ok: boolean) => {
       if (done) return;
       done = true;
-      clearInterval(poll);
+      if (poll !== undefined) clearInterval(poll);
       resolve(ok);
     };
     Office.onReady((info) => {
@@ -36,7 +38,7 @@ export function outlookReady(): Promise<boolean> {
       finish(info.host === Office.HostType.Outlook || !!Office.context?.mailbox);
     });
     // Secours : le message est disponible mais Office.onReady n'a pas été appelé.
-    const poll = setInterval(() => {
+    if (!done) poll = setInterval(() => {
       try {
         if (Office.context?.mailbox?.item) finish(true);
       } catch {
