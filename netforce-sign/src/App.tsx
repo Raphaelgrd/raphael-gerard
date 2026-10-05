@@ -467,7 +467,21 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
     }
   };
 
-  const downloadSigned = () => signedList.forEach((a) => downloadBlob(signedDocs[a.id].file.bytes, signedDocs[a.id].file.name, signedDocs[a.id].file.mime));
+  /** Sans réponse automatique (Outlook mobile) : feuille de partage du système si possible, sinon téléchargement. */
+  const shareSigned = async () => {
+    const files = signedList.map((a) => signedDocs[a.id].file);
+    const shareFiles = files.map((f) => new File([f.bytes as Uint8Array<ArrayBuffer>], f.name, { type: f.mime }));
+    try {
+      if (navigator.canShare?.({ files: shareFiles })) {
+        await navigator.share({ files: shareFiles });
+        return;
+      }
+    } catch (e) {
+      if ((e as Error)?.name === 'AbortError') return;
+      console.warn('Partage indisponible', e);
+    }
+    files.forEach((f) => downloadBlob(f.bytes, f.name, f.mime));
+  };
 
   useEffect(() => {
     if (!inOutlook) return;
@@ -719,8 +733,8 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
                   </button>
                 </>
               ) : (
-                <button className="btn primary" onClick={downloadSigned} disabled={!signedList.length}>
-                  <IconDownload width={16} height={16} /> Télécharger{signedList.length ? ` (${signedList.length})` : ''}
+                <button className="btn primary" onClick={shareSigned} disabled={!signedList.length}>
+                  <IconDownload width={16} height={16} /> Envoyer les fichiers{signedList.length ? ` (${signedList.length})` : ''}
                 </button>
               )}
             </div>
