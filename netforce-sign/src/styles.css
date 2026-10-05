@@ -1594,3 +1594,28 @@ button:disabled {
   padding-left: 16px;
   word-break: break-all;
 }
+
+.mail-entry {
+  display: grid;
+  gap: 4px;
+}
+
+.mail-fallback {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: #fff8e6;
+  border: 1px solid #f3d58a;
+  font-size: 12px;
+  color: #6b4e00;
+}
+
+.mail-fallback span {
+  flex: 1;
+}
+
+.mail-fallback .btn {
+  flex: none;
+}
