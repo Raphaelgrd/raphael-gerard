@@ -27,8 +27,8 @@ export default defineConfig(({ mode }) => ({
         short_name: 'NF Sign',
         description: 'Signature et cachet de documents PDF et Word, directement sur votre appareil.',
         lang: 'fr',
-        theme_color: '#0B1733',
-        background_color: '#0B1733',
+        theme_color: '#ffffff',
+        background_color: '#ffffff',
         display: 'standalone',
         start_url: '.',
         icons: [

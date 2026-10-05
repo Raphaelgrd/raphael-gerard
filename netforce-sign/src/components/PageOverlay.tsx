@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import type { Asset, FracRect, Kind, PageSize, Placement, Zone } from '../types';
 import { fitInZone, placementAt } from '../lib/util';
-import { IconTrash } from './Icons';
+import { IconPen, IconStamp, IconTrash } from './Icons';
 
 export interface OverlayProps {
   page: number;
@@ -118,9 +118,10 @@ export default function PageOverlay(props: OverlayProps) {
               props.onZoneClick(z);
             }}
             title={z.label}
+            aria-label={z.kind === 'signature' ? 'Signer ici' : 'Apposer le cachet'}
           >
             {asset && <img className="nf-zone-ghost" src={asset.src} alt="" style={pct(relative(z, fitInZone(z, size, asset, z.kind)))} />}
-            <span className="nf-zone-chip">{z.kind === 'signature' ? 'Signer ici' : 'Apposer le cachet'}</span>
+            <span className="nf-zone-chip">{z.kind === 'signature' ? <IconPen width={14} height={14} /> : <IconStamp width={14} height={14} />}</span>
           </button>
         );
       })}

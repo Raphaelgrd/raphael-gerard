@@ -126,10 +126,7 @@ export default function AssetModal({ kind, current, onSave, onClose }: Props) {
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal" role="dialog" aria-modal="true" aria-label={isSig ? 'Ma signature' : 'Mon cachet'}>
         <div className="modal-head">
-          <div>
-            <div className="eyebrow">{isSig ? 'Signature' : 'Cachet'}</div>
-            <h2>{isSig ? 'Votre signature.' : "Le cachet de l'entreprise."}</h2>
-          </div>
+          <h2>{isSig ? 'Signature' : 'Cachet'}</h2>
           <button className="icon-btn" onClick={onClose} aria-label="Fermer">
             <IconX />
           </button>
@@ -199,8 +196,7 @@ export default function AssetModal({ kind, current, onSave, onClose }: Props) {
                 ) : (
                   <>
                     <IconUpload width={28} height={28} />
-                    <span>{isSig ? 'Choisir votre signature' : 'Choisir votre tampon'} (PNG, JPG)</span>
-                    <small>PNG transparent, ou scan / photo sur fond blanc</small>
+                    <span>Choisir une image</span>
                   </>
                 )}
               </button>
@@ -213,7 +209,7 @@ export default function AssetModal({ kind, current, onSave, onClose }: Props) {
               />
               <label className="check">
                 <input type="checkbox" checked={removeBg} onChange={(e) => setRemoveBg(e.target.checked)} />
-                Rendre le fond blanc transparent
+                Fond transparent
               </label>
             </div>
           )}

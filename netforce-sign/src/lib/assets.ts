@@ -122,12 +122,12 @@ export interface StampOptions {
 }
 
 export const DEFAULT_STAMP: StampOptions = {
-  shape: 'round',
-  color: '#1E3FA8',
+  shape: 'rect',
+  color: '#141B2D',
   line1: 'NETFORCE',
-  line2: 'SAS NETFORCE–NEXSTUN',
-  line3: '34130 MAUGUIO',
-  line4: '',
+  line2: 'Centre Cial CARREFOUR',
+  line3: '34540 BALARUC LE VIEUX',
+  line4: 'Siret 897 655 197 00027',
 };
 
 function arcText(ctx: CanvasRenderingContext2D, text: string, cx: number, cy: number, r: number, top: boolean) {

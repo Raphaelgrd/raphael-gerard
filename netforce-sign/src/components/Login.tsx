@@ -35,15 +35,13 @@ export default function Login({ mode, invited, initialError, onPasswordSet }: Pr
 
   return (
     <main className="landing auth">
-      <div className="glow" />
       <div className="auth-card">
-        <div className="eyebrow">Accès équipe</div>
 
         {view === 'sign-in' && (
           <form onSubmit={(e) => run(e, () => signIn(email, password))}>
-            <h1 className="auth-title">Connexion.</h1>
+            <h1 className="auth-title">Connexion</h1>
             <label className="lbl">
-              <span>E-mail professionnel</span>
+              <span>E-mail</span>
               <input
                 className="field"
                 type="email"
@@ -72,7 +70,6 @@ export default function Login({ mode, invited, initialError, onPasswordSet }: Pr
             <button type="button" className="link center" onClick={() => (setView('forgot'), setError(null))}>
               Mot de passe oublié
             </button>
-            <p className="muted small center">Les comptes sont créés par un administrateur Netforce.</p>
           </form>
         )}
 
@@ -81,13 +78,13 @@ export default function Login({ mode, invited, initialError, onPasswordSet }: Pr
             onSubmit={(e) =>
               run(e, async () => {
                 await sendPasswordReset(email);
-                setInfo('Si un compte existe pour cette adresse, un e-mail de réinitialisation vient d’être envoyé.');
+                setInfo('E-mail envoyé.');
               })
             }
           >
-            <h1 className="auth-title">Mot de passe oublié.</h1>
+            <h1 className="auth-title">Mot de passe oublié</h1>
             <label className="lbl">
-              <span>E-mail professionnel</span>
+              <span>E-mail</span>
               <input
                 className="field"
                 type="email"
@@ -103,7 +100,7 @@ export default function Login({ mode, invited, initialError, onPasswordSet }: Pr
               Envoyer le lien
             </button>
             <button type="button" className="link center" onClick={() => (setView('sign-in'), setError(null), setInfo(null))}>
-              Retour à la connexion
+              Retour
             </button>
           </form>
         )}
@@ -122,10 +119,7 @@ export default function Login({ mode, invited, initialError, onPasswordSet }: Pr
               })
             }
           >
-            <h1 className="auth-title">{invited ? 'Bienvenue.' : 'Nouveau mot de passe.'}</h1>
-            <p className="muted">
-              {invited ? 'Choisissez votre mot de passe pour activer votre compte.' : 'Choisissez un nouveau mot de passe.'}
-            </p>
+            <h1 className="auth-title">{invited ? 'Activer le compte' : 'Nouveau mot de passe'}</h1>
             {invited && (
               <label className="lbl">
                 <span>Prénom et nom</span>
@@ -133,7 +127,7 @@ export default function Login({ mode, invited, initialError, onPasswordSet }: Pr
               </label>
             )}
             <label className="lbl">
-              <span>Mot de passe (8 caractères minimum)</span>
+              <span>Mot de passe (8 caractères min.)</span>
               <input
                 className="field"
                 type="password"
