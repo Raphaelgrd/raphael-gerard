@@ -138,7 +138,7 @@ export default function SignaturePad({ color, ref, onChange }: Props) {
         onPointerCancel={up}
       />
       <div className="pad-line" />
-      {empty && <div className="pad-hint">Signez ici — souris, doigt ou stylet</div>}
+      {empty && <div className="pad-hint">Signez ici</div>}
     </div>
   );
 }

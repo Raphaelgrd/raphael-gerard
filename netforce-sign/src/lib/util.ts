@@ -74,7 +74,7 @@ export function placementAt(
   asset: Asset,
   kind: Kind,
 ): Placement {
-  const wPx = size.width * (kind === 'signature' ? 0.28 : 0.18);
+  const wPx = size.width * (kind === 'signature' ? 0.28 : 0.3);
   let w = wPx;
   let h = wPx / asset.ratio;
   const maxH = size.width * (kind === 'signature' ? 0.1 : 0.2);

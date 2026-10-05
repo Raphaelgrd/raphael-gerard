@@ -94,8 +94,9 @@ export function signatureSize(pageW: number) {
   return { w: pageW * 0.3, h: pageW * 0.075 };
 }
 
+/** Assez large pour un tampon rectangulaire (~6 cm sur A4), assez haut pour un tampon rond. */
 export function stampSize(pageW: number) {
-  return { w: pageW * 0.2, h: pageW * 0.2 };
+  return { w: pageW * 0.3, h: pageW * 0.2 };
 }
 
 function clampRect(r: PxRect, W: number, H: number): PxRect {

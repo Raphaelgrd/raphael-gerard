@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import App from './App';
+import Brand from './components/Brand';
 import Login from './components/Login';
 import { authLinkError, authLinkType, cloudEnabled, fetchProfile, frError, signOut, supabase, type Profile } from './lib/cloud';
 
@@ -60,10 +61,7 @@ function CloudRoot() {
 
   const header = (
     <header className="topbar">
-      <div className="brand">
-        <span className="logo">NETFORCE</span>
-        <span className="badge">SIGN</span>
-      </div>
+      <Brand />
     </header>
   );
 

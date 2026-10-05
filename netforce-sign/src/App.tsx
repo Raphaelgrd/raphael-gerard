@@ -7,6 +7,7 @@ import { fetchAssets, frError, logSignature, saveCloudAsset, sha256, updateFullN
 import HistoryModal from './components/HistoryModal';
 import { baseName, downloadBlob, nextFrame, placementAt, placementFromZone } from './lib/util';
 import AssetModal from './components/AssetModal';
+import Brand from './components/Brand';
 import PageOverlay from './components/PageOverlay';
 import PdfView from './components/PdfView';
 import DocxView from './components/DocxView';
@@ -34,7 +35,7 @@ export interface CloudContext {
   onSignOut: () => void;
 }
 
-const NO_STAMP = "Aucun cachet d'entreprise pour le moment. Un administrateur doit l'importer.";
+const NO_STAMP = 'Cachet non défini (admin)';
 
 export default function App({ cloud }: { cloud: CloudContext | null }) {
   const ns = cloud?.profile.id;
@@ -83,7 +84,7 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
         (['signature', 'stamp'] as Kind[]).forEach((k) => saveAsset(k, remote[k], cloud.profile.id));
         setAssets(remote);
       })
-      .catch(() => alive && setToast('Hors ligne : signature et cachet chargés depuis cet appareil.'));
+      .catch(() => alive && setToast('Hors ligne'));
     return () => {
       alive = false;
     };
@@ -137,7 +138,7 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
     const isPdf = file.type === 'application/pdf' || lower.endsWith('.pdf');
     const isDocx = file.type === DOCX_MIME || lower.endsWith('.docx');
     if (!isPdf && !isDocx) {
-      setToast(lower.endsWith('.doc') ? 'Format .doc ancien : enregistrez-le en .docx depuis Word.' : 'Formats acceptés : PDF et Word (.docx).');
+      setToast(lower.endsWith('.doc') ? 'Enregistrez le fichier en .docx' : 'PDF ou Word uniquement');
       return;
     }
     reset();
@@ -158,7 +159,7 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
       } catch (e) {
         console.error(e);
         setDoc(null);
-        setToast('Impossible de lire ce PDF (protégé ou endommagé).');
+        setToast('PDF illisible');
       } finally {
         setBusy(null);
       }
@@ -167,16 +168,9 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
   };
 
   const announce = (z: Zone[]) => {
-    const s = z.filter((x) => x.kind === 'signature').length;
-    const c = z.filter((x) => x.kind === 'stamp').length;
-    if (!z.length) setToast('Aucune zone détectée. Ajoutez votre signature manuellement.');
-    else
-      setToast(
-        [s && `${s} zone${s > 1 ? 's' : ''} de signature`, c && `${c} zone${c > 1 ? 's' : ''} de cachet`]
-          .filter(Boolean)
-          .join(' · ') + ' détectée' + (z.length > 1 ? 's' : '') + '.',
-      );
+    if (!z.length) setToast('Aucune zone détectée');
   };
+
 
   const onDocxReady = useCallback(async (secs: HTMLElement[]) => {
     const { detectDocx, measurePages } = await import('./lib/docx');
@@ -223,7 +217,6 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
     snapshot();
     setPlacements((cur) => [...cur, ...todo.map((z) => placementFromZone(z, sizes[z.page], current[z.kind]!))]);
     setSelectedId(null);
-    setToast(`${todo.length} élément${todo.length > 1 ? 's' : ''} apposé${todo.length > 1 ? 's' : ''}. Ajustez si besoin.`);
   };
 
   const onZoneClick = (zone: Zone) => {
@@ -271,7 +264,7 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
     setAssets(nextAssets);
     saveAsset(kind, asset, ns);
     if (cloud) {
-      saveCloudAsset(kind, asset).catch((e) => setToast(`Enregistrement en ligne impossible : ${frError(e)}`));
+      saveCloudAsset(kind, asset).catch((e) => setToast(`Non enregistré : ${frError(e)}`));
     }
     // Les éléments déjà posés adoptent la nouvelle version.
     setPlacements((cur) =>
@@ -350,7 +343,6 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
           downloadBlob(await lib.exportPdfFromDocx(sections, docxHost.current!), name, 'application/pdf');
         }
       }
-      setToast('Document téléchargé.');
       if (cloud) {
         sha256(doc.bytes)
           .then((hash) =>
@@ -368,7 +360,7 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
       }
     } catch (e) {
       console.error(e);
-      setToast("L'export a échoué. Réessayez ou changez de format.");
+      setToast('Échec de l’export');
     } finally {
       document.body.classList.remove('nf-exporting');
       setBusy(null);
@@ -415,22 +407,22 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
       <div className="asset-card">
         <div className="asset-head">
           {isSig ? <IconPen /> : <IconStamp />}
-          <span>{isSig ? 'Ma signature' : 'Mon cachet'}</span>
+          <span>{isSig ? 'Signature' : 'Cachet'}</span>
           {canEdit(kind) ? (
             <button className="link" onClick={() => setModal({ kind, pending: null })}>
-              {a ? 'Modifier' : isSig ? 'Créer' : 'Importer'}
+              {a ? 'Modifier' : 'Ajouter'}
             </button>
           ) : (
-            <span className="asset-note">Commun à l’équipe</span>
+            <span className="asset-note">Équipe</span>
           )}
         </div>
         <button className="asset-preview checker" onClick={() => (a ? arm(kind) : requestAsset(kind, null))}>
-          {a ? <img src={a.src} alt="" /> : <span>{isSig ? 'Aucune signature' : canEdit(kind) ? 'Aucun cachet' : 'Cachet non défini'}</span>}
+          {a ? <img src={a.src} alt="" /> : <IconPlus width={20} height={20} />}
         </button>
         {doc && (
           <button className={`btn small ${armed === kind ? 'primary' : 'outline'}`} onClick={() => arm(kind)}>
             <IconPlus width={16} height={16} />
-            {armed === kind ? 'Cliquez sur la page…' : isSig ? 'Placer librement' : 'Placer le cachet'}
+            {armed === kind ? 'Cliquez sur la page' : 'Placer'}
           </button>
         )}
       </div>
@@ -448,10 +440,7 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
       onDrop={onDrop}
     >
       <header className="topbar">
-        <div className="brand">
-          <span className="logo">NETFORCE</span>
-          <span className="badge">SIGN</span>
-        </div>
+        <Brand />
         {doc && (
           <div className="doc-name" title={doc.name}>
             <IconFile width={16} height={16} />
@@ -475,15 +464,6 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
               <button className="icon-btn" onClick={undo} disabled={!history.length} title="Annuler (Ctrl+Z)" aria-label="Annuler">
                 <IconUndo />
               </button>
-              <button className="btn outline small hide-mobile" onClick={() => fileInput.current?.click()}>
-                Changer
-              </button>
-              <button className="btn primary small hide-mobile" onClick={() => exportAs('pdf')} disabled={!!busy}>
-                <IconDownload width={16} height={16} /> PDF
-              </button>
-              <button className="btn primary small hide-mobile" onClick={() => exportAs('docx')} disabled={!!busy}>
-                <IconDownload width={16} height={16} /> Word
-              </button>
             </>
           )}
         </div>
@@ -503,34 +483,12 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
 
       {!doc ? (
         <main className="landing">
-          <div className="glow" />
           <div className="landing-inner">
-            <div className="eyebrow">Signature de documents</div>
-            <h1>
-              Déposer. Signer.
-              <br />
-              Transmettre.
-            </h1>
-            <p className="lead">
-              PDF ou Word. Les zones de signature et de cachet sont détectées automatiquement — un clic pour apposer, un geste pour
-              ajuster.
-            </p>
             <button className={`dropzone ${dragOver ? 'over' : ''}`} onClick={() => fileInput.current?.click()}>
-              <IconUpload width={30} height={30} />
-              <strong>Choisir un document</strong>
-              <span>ou glissez-le ici · PDF, DOCX</span>
+              <IconUpload width={26} height={26} />
+              <strong>Ouvrir un document</strong>
+              <span>PDF · Word</span>
             </button>
-            <div className="assurances">
-              <span>
-                <IconCheck width={16} height={16} /> Documents traités sur l’appareil
-              </span>
-              <span>
-                <IconCheck width={16} height={16} /> Aucun document envoyé en ligne
-              </span>
-              <span>
-                <IconCheck width={16} height={16} /> Export PDF et Word
-              </span>
-            </div>
             <div className="landing-assets">
               {assetCard('signature')}
               {assetCard('stamp')}
@@ -542,7 +500,7 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
           <div ref={viewport} className={`viewport ${armed ? 'is-armed' : ''}`} onPointerDown={(e) => e.target === e.currentTarget && setSelectedId(null)}>
             {armed && (
               <div className="armed-banner">
-                {armed === 'signature' ? 'Touchez la page pour placer votre signature' : 'Touchez la page pour placer le cachet'}
+                Cliquez sur la page
                 <button className="link" onClick={() => setArmed(null)}>
                   Annuler
                 </button>
@@ -560,7 +518,7 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
                   console.error(e);
                   setBusy(null);
                   setDoc(null);
-                  setToast('Impossible de lire ce document Word.');
+                  setToast('Document Word illisible');
                 }}
               />
             )}
@@ -591,11 +549,9 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
             <div className="panel-body">
               <section>
                 <h3>
-                  Zones détectées <span className="count">{zones.length}</span>
+                  Zones <span className="count">{zones.length}</span>
                 </h3>
-                {zones.length === 0 ? (
-                  <p className="muted">Aucune zone trouvée. Utilisez « Placer librement » puis cliquez sur la page.</p>
-                ) : (
+                {zones.length === 0 ? null : (
                   <ul className="zone-list">
                     {zones.map((z) => {
                       const done = filledZoneIds.has(z.id);
@@ -629,17 +585,10 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
                     <IconDownload width={16} height={16} /> Word
                   </button>
                 </div>
-                <p className="muted small">
-                  {doc.kind === 'pdf'
-                    ? 'PDF : document d’origine conservé, texte sélectionnable. Word : chaque page devient une image fidèle.'
-                    : 'Word : document d’origine modifiable, signatures insérées en images. PDF : rendu fidèle des pages.'}
-                </p>
                 <button className="btn outline small" onClick={() => fileInput.current?.click()}>
-                  Ouvrir un autre document
+                  Autre document
                 </button>
               </section>
-
-              <p className="hint">Glissez un élément pour le déplacer, tirez le coin pour le redimensionner. Suppr pour l’effacer, Ctrl+Z pour annuler.</p>
             </div>
           </aside>
         </div>

@@ -1,8 +1,12 @@
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
 import type { Asset, DocKind, Kind } from '../types';
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+// Noms VITE_* (configuration manuelle) ou NEXT_PUBLIC_* (intégration Supabase de Vercel).
+const env = import.meta.env;
+const url = (env.VITE_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL) as string | undefined;
+const key = (env.VITE_SUPABASE_ANON_KEY ||
+  env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) as string | undefined;
 
 /** Sans configuration Supabase, l'app fonctionne en mode local (tout reste sur l'appareil). */
 export const cloudEnabled = !!(url && key);
