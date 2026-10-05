@@ -24,6 +24,7 @@ import {
   IconTarget,
   IconUndo,
   IconReply,
+  IconBack,
   IconUpload,
 } from './components/Icons';
 
@@ -35,6 +36,12 @@ export interface CloudContext {
   profile: Profile;
   onProfileChange: (p: Profile) => void;
   onSignOut: () => void;
+}
+
+interface SignedAttachment {
+  file: { bytes: Uint8Array; name: string; mime: string };
+  zones: Zone[];
+  placements: Placement[];
 }
 
 const NO_STAMP = 'Cachet non défini (admin)';
@@ -60,6 +67,10 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
   const [menuOpen, setMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [mail, setMail] = useState<{ attachments: outlook.MailAttachment[]; canReply: boolean; error?: string } | null>(null);
+  /** Outlook : pièce jointe ouverte, et documents validés (seuls ceux-ci sont renvoyés). */
+  const [current, setCurrent] = useState<outlook.MailAttachment | null>(null);
+  const [signedDocs, setSignedDocs] = useState<Record<string, SignedAttachment>>({});
+  const restoreRef = useRef<{ zones: Zone[]; placements: Placement[] } | null>(null);
   const [modal, setModal] = useState<{ kind: Kind; pending: Pending } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -156,9 +167,16 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
         const s = await getPageSizes(p);
         setPdf(p);
         setSizes(s);
-        const z = await detectPdf(p);
-        setZones(z);
-        announce(z);
+        const restore = restoreRef.current;
+        restoreRef.current = null;
+        if (restore) {
+          setZones(restore.zones);
+          setPlacements(restore.placements);
+        } else {
+          const z = await detectPdf(p);
+          setZones(z);
+          announce(z);
+        }
       } catch (e) {
         console.error(e);
         setDoc(null);
@@ -179,9 +197,16 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
     const { detectDocx, measurePages } = await import('./lib/docx');
     setSections(secs);
     setSizes(measurePages(secs));
-    const z = detectDocx(secs);
-    setZones(z);
-    announce(z);
+    const restore = restoreRef.current;
+    restoreRef.current = null;
+    if (restore) {
+      setZones(restore.zones);
+      setPlacements(restore.placements);
+    } else {
+      const z = detectDocx(secs);
+      setZones(z);
+      announce(z);
+    }
     setBusy(null);
   }, []);
 
@@ -375,22 +400,73 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
 
   const exportAs = (format: 'pdf' | 'docx') => runExport(format, (f) => downloadBlob(f.bytes, f.name, f.mime));
 
-  /** Outlook : répondre au message avec le document signé, dans son format d'origine. */
-  const replySigned = (replyAll: boolean) =>
-    runExport(doc!.kind, (f) => outlook.replyWithFile(f.name, f.bytes, replyAll));
-
   /* ---------- Outlook ---------- */
   const openAttachment = async (a: outlook.MailAttachment) => {
     try {
       setBusy('Ouverture…');
       const bytes = await outlook.readAttachment(a.id);
+      const prev = signedDocs[a.id];
+      restoreRef.current = prev ? { zones: prev.zones, placements: prev.placements } : null;
+      setCurrent(a);
       await openFile(new File([bytes], a.name, { type: a.kind === 'pdf' ? 'application/pdf' : DOCX_MIME }));
     } catch (e) {
       console.error(e);
+      restoreRef.current = null;
+      setCurrent(null);
       setBusy(null);
       setToast('Pièce jointe illisible');
     }
   };
+
+  const backToList = () => {
+    setDoc(null);
+    reset();
+    setCurrent(null);
+  };
+
+  /** Enregistre l'état du document ouvert : signé s'il porte au moins une signature ou un cachet, sinon retiré de l'envoi. */
+  const validateCurrent = async () => {
+    if (!current || !doc) return backToList();
+    const id = current.id;
+    if (!placements.length) {
+      setSignedDocs(({ [id]: _drop, ...rest }) => rest);
+      return backToList();
+    }
+    setSelectedId(null);
+    setArmed(null);
+    setBusy('Validation…');
+    document.body.classList.add('nf-exporting');
+    await nextFrame();
+    try {
+      const file = await buildSigned(doc.kind);
+      setSignedDocs((cur) => ({ ...cur, [id]: { file, zones, placements } }));
+      logExport(doc.kind);
+      backToList();
+    } catch (e) {
+      console.error(e);
+      setToast('Échec de la validation');
+    } finally {
+      document.body.classList.remove('nf-exporting');
+      setBusy(null);
+    }
+  };
+
+  const signedList = (mail?.attachments ?? []).filter((a) => signedDocs[a.id]);
+
+  const replyWithSigned = async (replyAll: boolean) => {
+    if (!signedList.length) return;
+    try {
+      await outlook.replyWithFiles(
+        signedList.map((a) => signedDocs[a.id].file),
+        replyAll,
+      );
+    } catch (e) {
+      console.error(e);
+      setToast('Réponse impossible');
+    }
+  };
+
+  const downloadSigned = () => signedList.forEach((a) => downloadBlob(signedDocs[a.id].file.bytes, signedDocs[a.id].file.name, signedDocs[a.id].file.mime));
 
   useEffect(() => {
     if (!inOutlook) return;
@@ -409,8 +485,8 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
       const first = load();
       if (first?.length === 1) openAttachment(first[0]);
       off = outlook.onItemChanged(() => {
-        setDoc(null);
-        reset();
+        backToList();
+        setSignedDocs({});
         const next = load();
         if (next?.length === 1) openAttachment(next[0]);
       });
@@ -483,7 +559,7 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
 
   return (
     <div
-      className={`app ${doc ? 'has-doc' : ''}`}
+      className={`app ${doc ? 'has-doc' : ''} ${inOutlook ? 'outlook' : ''}`}
       onDragOver={(e) => {
         e.preventDefault();
         setDragOver(true);
@@ -492,8 +568,14 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
       onDrop={onDrop}
     >
       <header className="topbar">
-        <Brand />
-        {doc && (
+        {inOutlook && doc ? (
+          <button className="ol-back" onClick={validateCurrent} aria-label="Retour aux pièces jointes">
+            <IconBack width={18} height={18} /> Documents
+          </button>
+        ) : (
+          <Brand />
+        )}
+        {doc && !inOutlook && (
           <div className="doc-name" title={doc.name}>
             <IconFile width={16} height={16} />
             <span>{doc.name}</span>
@@ -536,29 +618,60 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
       {!doc ? (
         <main className="landing">
           <div className="landing-inner">
-            {inOutlook && mail && (
-              <div className="mail-files">
-                {mail.error && <p className="form-error">{mail.error}</p>}
-                {!mail.error && mail.attachments.length === 0 && <p className="muted center">Aucun PDF ou Word dans ce mail</p>}
-                {mail.attachments.map((a) => (
-                  <button key={a.id} className="mail-file" onClick={() => openAttachment(a)}>
-                    <IconFile width={18} height={18} />
-                    <span>{a.name}</span>
-                    <small>{Math.max(1, Math.round(a.size / 1024))} Ko</small>
-                  </button>
-                ))}
+            {inOutlook ? (
+              <div className="ol-list">
+                <h2 className="ol-title">
+                  Pièces jointes {mail && <span className="count">{mail.attachments.length}</span>}
+                </h2>
+                {mail?.error && <p className="form-error">{mail.error}</p>}
+                {mail && !mail.error && mail.attachments.length === 0 && <p className="muted">Aucun PDF ou Word dans ce mail</p>}
+                {mail?.attachments.map((a) => {
+                  const done = !!signedDocs[a.id];
+                  return (
+                    <button key={a.id} className={`mail-file ${done ? 'done' : ''}`} onClick={() => openAttachment(a)}>
+                      <IconFile width={18} height={18} />
+                      <span>{a.name}</span>
+                      {done ? (
+                        <em className="status ok">
+                          <IconCheck width={14} height={14} /> Signé
+                        </em>
+                      ) : (
+                        <em className="status">À signer</em>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
+            ) : (
+              <button className={`dropzone ${dragOver ? 'over' : ''}`} onClick={() => fileInput.current?.click()}>
+                <IconUpload width={26} height={26} />
+                <strong>Ouvrir un document</strong>
+                <span>PDF · Word</span>
+              </button>
             )}
-            <button className={`dropzone ${dragOver ? 'over' : ''} ${inOutlook ? 'compact' : ''}`} onClick={() => fileInput.current?.click()}>
-              <IconUpload width={26} height={26} />
-              <strong>Ouvrir un document</strong>
-              <span>PDF · Word</span>
-            </button>
             <div className="landing-assets">
               {assetCard('signature')}
               {assetCard('stamp')}
             </div>
           </div>
+          {inOutlook && mail && mail.attachments.length > 0 && (
+            <div className="ol-bar">
+              {mail.canReply ? (
+                <>
+                  <button className="btn primary" onClick={() => replyWithSigned(false)} disabled={!signedList.length}>
+                    <IconReply width={16} height={16} /> Répondre{signedList.length ? ` (${signedList.length})` : ''}
+                  </button>
+                  <button className="btn outline" onClick={() => replyWithSigned(true)} disabled={!signedList.length}>
+                    Répondre à tous
+                  </button>
+                </>
+              ) : (
+                <button className="btn primary" onClick={downloadSigned} disabled={!signedList.length}>
+                  <IconDownload width={16} height={16} /> Télécharger{signedList.length ? ` (${signedList.length})` : ''}
+                </button>
+              )}
+            </div>
+          )}
         </main>
       ) : (
         <div className="workspace">
@@ -590,7 +703,24 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
             {doc.kind === 'docx' && sections.map((s, i) => createPortal(overlay(i), s, `ov-${i}`))}
           </div>
 
-          <aside className={`panel ${sheetOpen ? 'open' : ''}`}>
+          {inOutlook && (
+            <div className="ol-bar">
+              <button className={`icon-btn ${armed === 'signature' ? 'on' : ''}`} onClick={() => arm('signature')} aria-label="Placer la signature" title="Placer la signature">
+                <IconPen />
+              </button>
+              <button className={`icon-btn ${armed === 'stamp' ? 'on' : ''}`} onClick={() => arm('stamp')} aria-label="Placer le cachet" title="Placer le cachet">
+                <IconStamp />
+              </button>
+              <button className="btn outline" onClick={() => fillAll()} disabled={!openZones.length}>
+                <IconBolt width={16} height={16} /> Tout signer{openZones.length ? ` (${openZones.length})` : ''}
+              </button>
+              <button className="btn primary" onClick={validateCurrent} disabled={!!busy}>
+                <IconCheck width={16} height={16} /> Valider
+              </button>
+            </div>
+          )}
+
+          <aside className={`panel ${sheetOpen ? 'open' : ''}`} hidden={inOutlook}>
             <button className="sheet-handle" onClick={() => setSheetOpen((o) => !o)} aria-label="Afficher le panneau">
               <span />
             </button>
@@ -641,16 +771,6 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
               </section>
 
               <section className="export">
-                {inOutlook && mail?.canReply && (
-                  <div className="reply-row">
-                    <button className="btn primary" onClick={() => replySigned(false)} disabled={!!busy}>
-                      <IconReply width={16} height={16} /> Répondre
-                    </button>
-                    <button className="btn outline" onClick={() => replySigned(true)} disabled={!!busy}>
-                      Répondre à tous
-                    </button>
-                  </div>
-                )}
                 <h3>Télécharger</h3>
                 <div className="export-row">
                   <button className="btn primary" onClick={() => exportAs('pdf')} disabled={!!busy}>
