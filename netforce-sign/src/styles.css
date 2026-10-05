@@ -1557,3 +1557,22 @@ button:disabled {
 .app.outlook .toast {
   bottom: 64px;
 }
+
+.ol-wait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ol-wait .spinner.small {
+  margin: 0;
+}
+
+.ol-retry {
+  display: block;
+  margin-top: 6px;
+}

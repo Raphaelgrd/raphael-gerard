@@ -67,6 +67,7 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
   const [menuOpen, setMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [mail, setMail] = useState<{ attachments: outlook.MailAttachment[]; canReply: boolean; error?: string } | null>(null);
+  const [mailSlow, setMailSlow] = useState(false);
   /** Outlook : pièce jointe ouverte, et documents validés (seuls ceux-ci sont renvoyés). */
   const [current, setCurrent] = useState<outlook.MailAttachment | null>(null);
   const [signedDocs, setSignedDocs] = useState<Record<string, SignedAttachment>>({});
@@ -471,27 +472,51 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
   useEffect(() => {
     if (!inOutlook) return;
     let off = () => undefined as void;
+    const fail = (e: unknown) =>
+      setMail({ attachments: [], canReply: false, error: `${(e as Error)?.message ?? String(e)} (${outlook.describeHost()})` });
     const load = () => {
-      if (!outlook.canReadAttachments()) {
-        setMail({ attachments: [], canReply: false, error: 'Version d’Outlook trop ancienne' });
-        return;
+      try {
+        if (!outlook.canReadAttachments()) {
+          setMail({ attachments: [], canReply: false, error: `Version d’Outlook trop ancienne (${outlook.describeHost()})` });
+          return;
+        }
+        const attachments = outlook.listAttachments();
+        setMail({ attachments, canReply: outlook.canReplyWithFile() });
+        return attachments;
+      } catch (e) {
+        console.error(e);
+        fail(e);
       }
-      const attachments = outlook.listAttachments();
-      setMail({ attachments, canReply: outlook.canReplyWithFile() });
-      return attachments;
     };
-    outlook.outlookReady().then((ok) => {
-      if (!ok) return;
-      const first = load();
-      if (first?.length === 1) openAttachment(first[0]);
-      off = outlook.onItemChanged(() => {
-        backToList();
-        setSignedDocs({});
-        const next = load();
-        if (next?.length === 1) openAttachment(next[0]);
-      });
-    });
-    return () => off();
+    const slow = setTimeout(() => setMailSlow(true), 10000);
+    if (typeof Office === 'undefined') {
+      fail(new Error('Outlook n’a pas chargé le complément'));
+      return () => clearTimeout(slow);
+    }
+    outlook
+      .outlookReady()
+      .then((ok) => {
+        clearTimeout(slow);
+        setMailSlow(false);
+        if (!ok) return fail(new Error('Ouvrez ce volet depuis un mail dans Outlook'));
+        const first = load();
+        if (first?.length === 1) openAttachment(first[0]);
+        try {
+          off = outlook.onItemChanged(() => {
+            backToList();
+            setSignedDocs({});
+            const next = load();
+            if (next?.length === 1) openAttachment(next[0]);
+          });
+        } catch (e) {
+          console.warn('Suivi du message indisponible', e);
+        }
+      })
+      .catch(fail);
+    return () => {
+      clearTimeout(slow);
+      off();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inOutlook]);
 
@@ -623,7 +648,25 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
                 <h2 className="ol-title">
                   Pièces jointes {mail && <span className="count">{mail.attachments.length}</span>}
                 </h2>
-                {mail?.error && <p className="form-error">{mail.error}</p>}
+                {!mail && (
+                  <div className="ol-wait">
+                    <div className="spinner small" />
+                    <span>Connexion à Outlook…</span>
+                    {mailSlow && (
+                      <button className="btn outline small" onClick={() => window.location.reload()}>
+                        Réessayer
+                      </button>
+                    )}
+                  </div>
+                )}
+                {mail?.error && (
+                  <div className="form-error">
+                    {mail.error}
+                    <button className="link ol-retry" onClick={() => window.location.reload()}>
+                      Réessayer
+                    </button>
+                  </div>
+                )}
                 {mail && !mail.error && mail.attachments.length === 0 && <p className="muted">Aucun PDF ou Word dans ce mail</p>}
                 {mail?.attachments.map((a) => {
                   const done = !!signedDocs[a.id];
