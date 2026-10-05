@@ -17,17 +17,30 @@ const officeLoaded = () => typeof Office !== 'undefined' && !!Office.onReady;
 
 let ready: Promise<boolean> | null = null;
 
-/** Attend l'initialisation d'Office.js ; résout `false` hors d'Outlook. */
+/**
+ * Attend l'initialisation d'Office.js. Ne renvoie `false` que si Office.js est absent ou si l'hôte n'est pas Outlook :
+ * Outlook mobile peut mettre plusieurs secondes à répondre au premier lancement, on attend donc sans limite.
+ */
 export function outlookReady(): Promise<boolean> {
   if (!inOutlookPane || !officeLoaded()) return Promise.resolve(false);
   ready ??= new Promise((resolve) => {
-    const timeout = setTimeout(() => resolve(false), 8000);
     Office.onReady((info) => {
-      clearTimeout(timeout);
-      resolve(info.host === Office.HostType.Outlook);
+      // Certaines versions mobiles renseignent mal `host` : la présence d'une boîte mail suffit.
+      resolve(info.host === Office.HostType.Outlook || !!Office.context?.mailbox);
     });
   });
   return ready;
+}
+
+/** Description courte de l'environnement Outlook, affichée en cas de problème. */
+export function describeHost(): string {
+  try {
+    const d = Office.context.diagnostics;
+    const sets = ['1.15', '1.8', '1.5'].find((v) => Office.context.requirements.isSetSupported('Mailbox', v)) ?? '< 1.5';
+    return `${d?.platform ?? '?'} · ${d?.version ?? '?'} · Mailbox ${sets}`;
+  } catch {
+    return typeof Office === 'undefined' ? 'Office.js non chargé' : 'Outlook';
+  }
 }
 
 const mailbox = () => Office.context.mailbox;
