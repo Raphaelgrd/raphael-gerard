@@ -2,7 +2,9 @@
 
 Application de signature de documents pour PC et mobile. On charge un PDF ou un Word, l'app détecte les zones de signature et de cachet, un clic suffit pour apposer, puis on ajuste à la main et on télécharge en PDF ou en Word.
 
-Tout le traitement se fait **dans le navigateur** : aucun document n'est envoyé sur un serveur.
+Les documents sont traités **dans le navigateur** : ils ne sont jamais envoyés en ligne.
+
+**Mise en ligne pour l'équipe : voir [DEPLOIEMENT.md](DEPLOIEMENT.md).**
 
 ## Fonctionnalités
 
@@ -25,6 +27,12 @@ Tout le traitement se fait **dans le navigateur** : aucun document n'est envoyé
   | PDF | PDF d'origine conservé (texte sélectionnable) + images apposées | Une page = une image haute définition |
   | Word | Rendu fidèle des pages (images) | `.docx` d'origine **modifiable**, signatures insérées en images ancrées |
 
+- **Comptes d'équipe** (Supabase, facultatif) :
+  - connexion par e-mail et mot de passe, comptes créés ou invités par un administrateur ;
+  - chacun retrouve sa signature sur tous ses appareils ;
+  - le tampon est commun à l'entreprise et seuls les administrateurs peuvent le changer ;
+  - l'historique garde qui a signé quoi et quand, avec l'empreinte SHA-256 du fichier. Les admins voient tout le monde.
+  - Sans configuration Supabase, l'app fonctionne seule, en local.
 - **PWA installable** (« Ajouter à l'écran d'accueil » sur iOS/Android, « Installer » sur Chrome/Edge) et utilisable hors ligne.
 
 ## Lancer en local
@@ -32,7 +40,16 @@ Tout le traitement se fait **dans le navigateur** : aucun document n'est envoyé
 ```bash
 cd netforce-sign
 npm install
-npm run dev        # http://localhost:5173
+npm run dev        # http://localhost:5173 — mode local, sans comptes
+```
+
+Avec les comptes, sur un Supabase local (Docker requis) :
+
+```bash
+npx supabase start                 # applique supabase/migrations
+cp .env.example .env.local         # renseigner l'URL et la clé anon affichées
+npm run dev
+node supabase/tests/rls.mjs        # vérifie les règles d'accès (21 contrôles)
 ```
 
 ## Build de production
@@ -42,7 +59,7 @@ npm run build      # génère dist/ (site statique)
 npm run preview    # sert dist/ en local
 ```
 
-Le dossier `dist/` est un site statique : il se déploie tel quel sur Netlify, Vercel, GitHub Pages, un serveur interne ou un intranet. L'installation en PWA requiert HTTPS.
+Le dossier `dist/` est un site statique. `vercel.json` contient la configuration Vercel et des en-têtes de sécurité (CSP stricte, anti-iframe). `npm run preview` applique les mêmes en-têtes. L'installation en PWA requiert HTTPS.
 
 ## Limites connues
 
@@ -53,12 +70,16 @@ Le dossier `dist/` est un site statique : il se déploie tel quel sur Netlify, V
 
 ## Stack
 
-React 19 + TypeScript + Vite · [pdf.js](https://mozilla.github.io/pdf.js/) (rendu et extraction du texte) · [pdf-lib](https://pdf-lib.js.org/) (écriture PDF) · [docx-preview](https://github.com/VolodymyrBaydalka/docxjs) (rendu Word) · JSZip (modification du `.docx`) · [docx](https://docx.js.org/) · html2canvas · vite-plugin-pwa.
+React 19 + TypeScript + Vite · [pdf.js](https://mozilla.github.io/pdf.js/) (rendu et extraction du texte) · [pdf-lib](https://pdf-lib.js.org/) (écriture PDF) · [docx-preview](https://github.com/VolodymyrBaydalka/docxjs) (rendu Word) · JSZip (modification du `.docx`) · [docx](https://docx.js.org/) · html2canvas · vite-plugin-pwa · Supabase (Auth + Postgres + RLS).
 
 ## Organisation du code
 
 ```
+supabase/
+  migrations/             schéma : profils, signatures / cachet, historique, règles RLS
+  tests/rls.mjs           vérification automatique des droits
 src/
+  Root.tsx                connexion, invitation, mot de passe oublié
   App.tsx                 état global, ouverture, placement, export
   components/
     PdfView.tsx           rendu des pages PDF (chargement progressif)
@@ -71,4 +92,5 @@ src/
     pdf.ts                lecture, détection, export PDF (gère les pages pivotées)
     docx.ts               rendu, détection, export Word (images ancrées) et PDF
     assets.ts             signature écrite, import d'image, générateur de cachet
+    cloud.ts              accès Supabase (comptes, signatures, historique)
 ```

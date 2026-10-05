@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { Asset, Kind, LoadedDoc, PageSize, Placement, Zone } from './types';
 import { loadAsset, saveAsset } from './lib/assets';
+import { fetchAssets, frError, logSignature, saveCloudAsset, sha256, updateFullName, type Profile } from './lib/cloud';
+import HistoryModal from './components/HistoryModal';
 import { baseName, downloadBlob, nextFrame, placementAt, placementFromZone } from './lib/util';
 import AssetModal from './components/AssetModal';
 import PageOverlay from './components/PageOverlay';
@@ -26,7 +28,19 @@ const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingm
 
 type Pending = { type: 'zone'; zone: Zone } | { type: 'all' } | { type: 'arm' } | null;
 
-export default function App() {
+export interface CloudContext {
+  profile: Profile;
+  onProfileChange: (p: Profile) => void;
+  onSignOut: () => void;
+}
+
+const NO_STAMP = "Aucun cachet d'entreprise pour le moment. Un administrateur doit l'importer.";
+
+export default function App({ cloud }: { cloud: CloudContext | null }) {
+  const ns = cloud?.profile.id;
+  const isAdmin = !cloud || cloud.profile.role === 'admin';
+  /** Le cachet est commun à l'entreprise : seuls les administrateurs le modifient. */
+  const canEdit = (kind: Kind) => kind === 'signature' || isAdmin;
   const [doc, setDoc] = useState<LoadedDoc | null>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [sections, setSections] = useState<HTMLElement[]>([]);
@@ -37,9 +51,11 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [armed, setArmed] = useState<Kind | null>(null);
   const [assets, setAssets] = useState<Record<Kind, Asset | null>>(() => ({
-    signature: loadAsset('signature'),
-    stamp: loadAsset('stamp'),
+    signature: loadAsset('signature', ns),
+    stamp: loadAsset('stamp', ns),
   }));
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [modal, setModal] = useState<{ kind: Kind; pending: Pending } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -50,6 +66,29 @@ export default function App() {
   const fileInput = useRef<HTMLInputElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const docxHost = useRef<HTMLDivElement>(null);
+
+  /* ---------- Synchronisation du compte ---------- */
+  useEffect(() => {
+    if (!cloud) return;
+    let alive = true;
+    fetchAssets(cloud.profile.id)
+      .then((remote) => {
+        if (!alive) return;
+        // Première connexion sur cet appareil : on envoie la signature déjà créée en local.
+        const legacy = loadAsset('signature');
+        if (!remote.signature && legacy) {
+          remote.signature = legacy;
+          saveCloudAsset('signature', legacy).catch(() => null);
+        }
+        (['signature', 'stamp'] as Kind[]).forEach((k) => saveAsset(k, remote[k], cloud.profile.id));
+        setAssets(remote);
+      })
+      .catch(() => alive && setToast('Hors ligne : signature et cachet chargés depuis cet appareil.'));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloud?.profile.id]);
 
   /* ---------- Mise en page ---------- */
   useEffect(() => {
@@ -162,12 +201,23 @@ export default function App() {
     setSelectedId(p.id);
   };
 
+  const requestAsset = (kind: Kind, pending: Pending) => {
+    if (canEdit(kind)) setModal({ kind, pending });
+    else setToast(NO_STAMP);
+  };
+
   const fillAll = (current = assets) => {
-    const todo = zones.filter((z) => !filledZoneIds.has(z.id));
-    const missing = (['signature', 'stamp'] as Kind[]).find((k) => !current[k] && todo.some((z) => z.kind === k));
+    let todo = zones.filter((z) => !filledZoneIds.has(z.id));
+    const missing = (['signature', 'stamp'] as Kind[]).find(
+      (k) => !current[k] && canEdit(k) && todo.some((z) => z.kind === k),
+    );
     if (missing) {
       setModal({ kind: missing, pending: { type: 'all' } });
       return;
+    }
+    if (todo.some((z) => !current[z.kind])) {
+      setToast(NO_STAMP);
+      todo = todo.filter((z) => current[z.kind]);
     }
     if (!todo.length) return;
     snapshot();
@@ -178,13 +228,13 @@ export default function App() {
 
   const onZoneClick = (zone: Zone) => {
     const asset = assets[zone.kind];
-    if (!asset) setModal({ kind: zone.kind, pending: { type: 'zone', zone } });
+    if (!asset) requestAsset(zone.kind, { type: 'zone', zone });
     else placeZone(zone, asset);
   };
 
   const arm = (kind: Kind) => {
     if (!assets[kind]) {
-      setModal({ kind, pending: { type: 'arm' } });
+      requestAsset(kind, { type: 'arm' });
       return;
     }
     setArmed((a) => (a === kind ? null : kind));
@@ -219,7 +269,10 @@ export default function App() {
     const kind = modal.kind;
     const nextAssets = { ...assets, [kind]: asset };
     setAssets(nextAssets);
-    saveAsset(kind, asset);
+    saveAsset(kind, asset, ns);
+    if (cloud) {
+      saveCloudAsset(kind, asset).catch((e) => setToast(`Enregistrement en ligne impossible : ${frError(e)}`));
+    }
     // Les éléments déjà posés adoptent la nouvelle version.
     setPlacements((cur) =>
       cur.map((p) => {
@@ -298,6 +351,21 @@ export default function App() {
         }
       }
       setToast('Document téléchargé.');
+      if (cloud) {
+        sha256(doc.bytes)
+          .then((hash) =>
+            logSignature({
+              document_name: doc.name.slice(0, 300),
+              document_kind: doc.kind,
+              export_format: format,
+              document_sha256: hash,
+              page_count: sizes.length,
+              signature_count: placements.filter((p) => p.kind === 'signature').length,
+              stamp_count: placements.filter((p) => p.kind === 'stamp').length,
+            }),
+          )
+          .catch((e) => console.warn('Historique non enregistré', e));
+      }
     } catch (e) {
       console.error(e);
       setToast("L'export a échoué. Réessayez ou changez de format.");
@@ -348,12 +416,16 @@ export default function App() {
         <div className="asset-head">
           {isSig ? <IconPen /> : <IconStamp />}
           <span>{isSig ? 'Ma signature' : 'Mon cachet'}</span>
-          <button className="link" onClick={() => setModal({ kind, pending: null })}>
-            {a ? 'Modifier' : 'Créer'}
-          </button>
+          {canEdit(kind) ? (
+            <button className="link" onClick={() => setModal({ kind, pending: null })}>
+              {a ? 'Modifier' : isSig ? 'Créer' : 'Importer'}
+            </button>
+          ) : (
+            <span className="asset-note">Commun à l’équipe</span>
+          )}
         </div>
-        <button className="asset-preview checker" onClick={() => (a ? arm(kind) : setModal({ kind, pending: null }))}>
-          {a ? <img src={a.src} alt="" /> : <span>{isSig ? 'Aucune signature' : 'Aucun cachet'}</span>}
+        <button className="asset-preview checker" onClick={() => (a ? arm(kind) : requestAsset(kind, null))}>
+          {a ? <img src={a.src} alt="" /> : <span>{isSig ? 'Aucune signature' : canEdit(kind) ? 'Aucun cachet' : 'Cachet non défini'}</span>}
         </button>
         {doc && (
           <button className={`btn small ${armed === kind ? 'primary' : 'outline'}`} onClick={() => arm(kind)}>
@@ -387,6 +459,17 @@ export default function App() {
           </div>
         )}
         <div className="top-actions">
+          {cloud && (
+            <UserMenu
+              cloud={cloud}
+              open={menuOpen}
+              onToggle={() => setMenuOpen((o) => !o)}
+              onHistory={() => {
+                setMenuOpen(false);
+                setHistoryOpen(true);
+              }}
+            />
+          )}
           {doc && (
             <>
               <button className="icon-btn" onClick={undo} disabled={!history.length} title="Annuler (Ctrl+Z)" aria-label="Annuler">
@@ -439,10 +522,10 @@ export default function App() {
             </button>
             <div className="assurances">
               <span>
-                <IconCheck width={16} height={16} /> Traitement 100 % local
+                <IconCheck width={16} height={16} /> Documents traités sur l’appareil
               </span>
               <span>
-                <IconCheck width={16} height={16} /> Aucun envoi sur un serveur
+                <IconCheck width={16} height={16} /> Aucun document envoyé en ligne
               </span>
               <span>
                 <IconCheck width={16} height={16} /> Export PDF et Word
@@ -578,7 +661,85 @@ export default function App() {
 
       {toast && <div className="toast">{toast}</div>}
 
+      {historyOpen && <HistoryModal isAdmin={!!cloud && cloud.profile.role === 'admin'} onClose={() => setHistoryOpen(false)} />}
+
       {modal && <AssetModal kind={modal.kind} current={assets[modal.kind]} onSave={onSaveAsset} onClose={() => setModal(null)} />}
+    </div>
+  );
+}
+
+function UserMenu({
+  cloud,
+  open,
+  onToggle,
+  onHistory,
+}: {
+  cloud: CloudContext;
+  open: boolean;
+  onToggle: () => void;
+  onHistory: () => void;
+}) {
+  const { profile } = cloud;
+  const name = profile.full_name || profile.email;
+  const initials = name
+    .split(/[\s.@_-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join('');
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(profile.full_name ?? '');
+
+  const saveName = async () => {
+    const v = draft.trim();
+    if (!v) return;
+    try {
+      await updateFullName(profile.id, v);
+      cloud.onProfileChange({ ...profile, full_name: v });
+      setEditing(false);
+    } catch {
+      /* hors ligne : on garde le formulaire ouvert */
+    }
+  };
+
+  return (
+    <div className="user-menu">
+      <button className="avatar" onClick={onToggle} aria-label="Mon compte" aria-expanded={open}>
+        {initials}
+      </button>
+      {open && (
+        <>
+          <div className="menu-veil" onPointerDown={onToggle} />
+          <div className="menu" role="menu">
+            <div className="menu-id">
+              {editing ? (
+                <form
+                  className="name-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    saveName();
+                  }}
+                >
+                  <input className="field" value={draft} autoFocus onChange={(e) => setDraft(e.target.value)} placeholder="Prénom Nom" />
+                  <button className="btn primary small">OK</button>
+                </form>
+              ) : (
+                <button className="menu-name" onClick={() => setEditing(true)} title="Modifier mon nom">
+                  {name}
+                </button>
+              )}
+              <span className="menu-email">{profile.email}</span>
+              {profile.role === 'admin' && <span className="tag">Administrateur</span>}
+            </div>
+            <button className="menu-item" role="menuitem" onClick={onHistory}>
+              {profile.role === 'admin' ? 'Historique de l’équipe' : 'Mon historique'}
+            </button>
+            <button className="menu-item danger" role="menuitem" onClick={cloud.onSignOut}>
+              Se déconnecter
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

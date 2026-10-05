@@ -1,21 +1,22 @@
 import type { Asset, Kind } from '../types';
 import { loadImage } from './util';
 
-const KEY = (k: Kind) => `nf-sign.asset.${k}`;
+/** `ns` isole les données de chaque compte sur un appareil partagé. */
+const KEY = (k: Kind, ns?: string) => (ns ? `nf-sign.${ns}.asset.${k}` : `nf-sign.asset.${k}`);
 
-export function loadAsset(kind: Kind): Asset | null {
+export function loadAsset(kind: Kind, ns?: string): Asset | null {
   try {
-    const raw = localStorage.getItem(KEY(kind));
+    const raw = localStorage.getItem(KEY(kind, ns));
     return raw ? (JSON.parse(raw) as Asset) : null;
   } catch {
     return null;
   }
 }
 
-export function saveAsset(kind: Kind, asset: Asset | null) {
+export function saveAsset(kind: Kind, asset: Asset | null, ns?: string) {
   try {
-    if (asset) localStorage.setItem(KEY(kind), JSON.stringify(asset));
-    else localStorage.removeItem(KEY(kind));
+    if (asset) localStorage.setItem(KEY(kind, ns), JSON.stringify(asset));
+    else localStorage.removeItem(KEY(kind, ns));
   } catch {
     /* stockage indisponible (navigation privée) : l'actif reste en mémoire */
   }
