@@ -1395,3 +1395,165 @@ button:disabled {
     font-size: 28px;
   }
 }
+
+/* ---------- Mode Outlook (volet du complément) ---------- */
+
+.panel[hidden] {
+  display: none !important;
+}
+
+.app.outlook {
+  --accent: #0f6cbd;
+  --accent-hover: #115ea3;
+  --accent-soft: #ebf3fc;
+  --top-h: 44px;
+  font-family: 'Segoe UI', 'Segoe UI Web (West European)', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
+}
+
+.app.outlook .topbar {
+  padding: 0 10px;
+  gap: 8px;
+}
+
+.app.outlook .logo-img {
+  height: 18px;
+}
+
+.app.outlook .logo {
+  font-size: 14px;
+}
+
+.app.outlook .btn {
+  height: 32px;
+  border-radius: 4px;
+  font-size: 13px;
+  padding: 0 12px;
+}
+
+.app.outlook .icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+.app.outlook .icon-btn.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ol-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 32px;
+  padding: 0 10px 0 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.ol-back:hover {
+  background: var(--accent-soft);
+}
+
+/* Liste des pièces jointes */
+.app.outlook .landing {
+  display: flex;
+  flex-direction: column;
+  place-items: stretch;
+  padding: 0;
+}
+
+.app.outlook .landing-inner {
+  flex: 1;
+  max-width: none;
+  padding: 12px;
+  overflow: auto;
+}
+
+.ol-list {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.ol-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.app.outlook .mail-file {
+  padding: 10px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.mail-file.done {
+  border-color: #9fd89f;
+  background: #f1faf1;
+}
+
+.status {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--canvas);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.status.ok {
+  background: #dff6dd;
+  color: #107c10;
+}
+
+.app.outlook .landing-assets {
+  grid-template-columns: 1fr 1fr;
+  margin-top: 0;
+}
+
+/* Barre d'actions fixe en bas */
+.ol-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.ol-bar .btn {
+  flex: 1;
+  min-width: 0;
+}
+
+.ol-bar .btn.primary {
+  flex: 1.2;
+}
+
+.app.outlook .workspace {
+  flex-direction: column;
+}
+
+.app.outlook .viewport {
+  padding: 10px 6px 24px;
+}
+
+.app.outlook .toast {
+  bottom: 64px;
+}

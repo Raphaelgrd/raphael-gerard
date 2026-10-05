@@ -56,3 +56,6 @@ export const IconTarget = (p: P) => (
 export const IconReply = (p: P) => (
   <svg {...base(p)}><path d="M10 9 5 13l5 4" /><path d="M5 13h9a5 5 0 0 1 5 5v1" /></svg>
 );
+export const IconBack = (p: P) => (
+  <svg {...base(p)}><path d="m15 6-6 6 6 6" /></svg>
+);

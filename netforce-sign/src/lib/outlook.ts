@@ -81,13 +81,17 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-/** Ouvre une réponse (ou « répondre à tous ») avec le document signé en pièce jointe. */
-export function replyWithFile(name: string, bytes: Uint8Array, replyAll = false): Promise<void> {
+/** Ouvre une réponse (ou « répondre à tous ») avec les documents signés en pièces jointes. */
+export function replyWithFiles(files: { name: string; bytes: Uint8Array }[], replyAll = false): Promise<void> {
   return new Promise((resolve, reject) => {
     const item = mailbox().item as Office.MessageRead;
     const form: Office.ReplyFormData = {
       htmlBody: '',
-      attachments: [{ type: Office.MailboxEnums.AttachmentType.Base64, name, base64file: toBase64(bytes) }],
+      attachments: files.map((f) => ({
+        type: Office.MailboxEnums.AttachmentType.Base64,
+        name: f.name,
+        base64file: toBase64(f.bytes),
+      })),
     };
     const done = (res: Office.AsyncResult<void>) =>
       res.status === Office.AsyncResultStatus.Succeeded ? resolve() : reject(new Error(res.error?.message ?? 'Réponse impossible'));
