@@ -6,6 +6,11 @@ Durée : environ 20 minutes. Deux comptes gratuits sont nécessaires : **Supabas
 
 ---
 
+## Raccourci : l'intégration Supabase de Vercel
+
+Sur l'écran de déploiement Vercel, le bloc **Supabase → Add** crée la base et renseigne les variables tout seul (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, que l'app reconnaît). Choisissez une région **Europe**.
+Dans ce cas, sautez la création du projet et la récupération des clés. Ouvrez ensuite la base depuis Vercel (**Storage → Supabase → Open in Supabase**) et faites quand même les étapes **1.2 et 1.3** (script SQL, inscriptions fermées), puis les étapes 3 à 6.
+
 ## 1. Créer la base de données (Supabase)
 
 1. Créez un compte sur https://supabase.com, puis **New project**.

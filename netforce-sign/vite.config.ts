@@ -43,6 +43,8 @@ export default defineConfig(({ mode }) => ({
       },
     }),
   ],
+  // NEXT_PUBLIC_SUPABASE_* : variables créées par l'intégration Supabase de Vercel (publiques par nature).
+  envPrefix: ['VITE_', 'NEXT_PUBLIC_SUPABASE_'],
   server: { host: '0.0.0.0', port: 5173 },
-  preview: { headers: productionHeaders(loadEnv(mode, process.cwd(), '').VITE_SUPABASE_URL) },
+  preview: { headers: productionHeaders(loadEnv(mode, process.cwd(), '').VITE_SUPABASE_URL || loadEnv(mode, process.cwd(), '').NEXT_PUBLIC_SUPABASE_URL) },
 }));
