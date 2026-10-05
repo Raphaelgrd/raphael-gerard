@@ -92,6 +92,8 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,mjs,woff2}'],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        // Le manifeste Outlook et les pages du complément viennent toujours du serveur, jamais de l'app en cache.
+        navigateFallbackDenylist: [/\.xml$/, /^\/office\//, /^\/taskpane\.html/],
       },
     }),
   ],
