@@ -44,7 +44,7 @@ function loadStampOptions(): StampOptions {
 
 export default function AssetModal({ kind, current, onSave, onClose }: Props) {
   const isSig = kind === 'signature';
-  const [tab, setTab] = useState<Tab>(isSig ? 'draw' : 'generate');
+  const [tab, setTab] = useState<Tab>('import');
   const [ink, setInk] = useState(isSig ? INKS[0].id : STAMP_INKS[0].id);
   const [padEmpty, setPadEmpty] = useState(true);
   const pad = useRef<SignaturePadHandle>(null);
@@ -111,13 +111,13 @@ export default function AssetModal({ kind, current, onSave, onClose }: Props) {
 
   const tabs: { id: Tab; label: string }[] = isSig
     ? [
+        { id: 'import', label: 'Importer' },
         { id: 'draw', label: 'Dessiner' },
         { id: 'type', label: 'Écrire' },
-        { id: 'import', label: 'Importer' },
       ]
     : [
-        { id: 'generate', label: 'Composer' },
         { id: 'import', label: 'Importer' },
+        { id: 'generate', label: 'Composer' },
       ];
 
   const inks = isSig ? INKS : STAMP_INKS;
@@ -199,8 +199,8 @@ export default function AssetModal({ kind, current, onSave, onClose }: Props) {
                 ) : (
                   <>
                     <IconUpload width={28} height={28} />
-                    <span>Choisir une image (PNG, JPG)</span>
-                    <small>Photo ou scan sur fond blanc</small>
+                    <span>{isSig ? 'Choisir votre signature' : 'Choisir votre tampon'} (PNG, JPG)</span>
+                    <small>PNG transparent, ou scan / photo sur fond blanc</small>
                   </>
                 )}
               </button>
