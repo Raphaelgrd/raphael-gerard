@@ -410,7 +410,7 @@ export default function App({ cloud }: { cloud: CloudContext | null }) {
           <span>{isSig ? 'Signature' : 'Cachet'}</span>
           {canEdit(kind) ? (
             <button className="link" onClick={() => setModal({ kind, pending: null })}>
-              {a ? 'Modifier' : isSig ? 'Créer' : 'Importer'}
+              {a ? 'Modifier' : 'Ajouter'}
             </button>
           ) : (
             <span className="asset-note">Équipe</span>
