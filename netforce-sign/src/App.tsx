@@ -117,7 +117,7 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3200);
+    const t = setTimeout(() => setToast(null), toast.length > 60 ? 9000 : 3200);
     return () => clearTimeout(t);
   }, [toast]);
 
@@ -415,7 +415,7 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
       restoreRef.current = null;
       setCurrent(null);
       setBusy(null);
-      setToast('Pièce jointe illisible');
+      setToast(`Pièce jointe illisible — ${(e as Error)?.message ?? e} (${outlook.describeHost()})`);
     }
   };
 
