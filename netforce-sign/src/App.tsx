@@ -184,14 +184,18 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
           setZones(restore.zones);
           setPlacements(restore.placements);
         } else {
-          const z = await detectPdf(p);
+          // Une détection ratée ne doit pas empêcher de signer à la main.
+          const z = await detectPdf(p).catch((e) => {
+            console.error(e);
+            return [] as Zone[];
+          });
           setZones(z);
           announce(z);
         }
       } catch (e) {
         console.error(e);
         setDoc(null);
-        setToast('PDF illisible');
+        setToast(`PDF illisible — ${(e as Error)?.message ?? e}`);
       } finally {
         setBusy(null);
       }
@@ -424,17 +428,34 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
     if (manual) return openWithBytes(a, manual);
     try {
       setBusy('Ouverture…');
+      const { looksLikePdf, describeBytes } = await import('./lib/pdf');
+      // Un PDF reçu sans son en-tête « %PDF » est un contenu erroné (page d'erreur, lien…), pas le fichier.
+      const valid = (b: ArrayBuffer) => a.kind !== 'pdf' || looksLikePdf(b);
+      const viaGraph = async () => {
+        const b = await graph.readAttachmentViaGraph(a);
+        if (!valid(b)) throw new Error(`Microsoft Graph a renvoyé un contenu invalide (${describeBytes(b)})`);
+        return b;
+      };
+      const viaOffice = async () => {
+        const b = await outlook.readAttachment(a.id);
+        if (!valid(b)) throw new Error(`contenu invalide (${describeBytes(b)})`);
+        return b;
+      };
       let bytes: ArrayBuffer;
       if (graph.graphConfigured && officeReadBroken.current) {
-        bytes = await graph.readAttachmentViaGraph(a);
+        bytes = await viaGraph();
       } else {
         try {
-          bytes = await outlook.readAttachment(a.id);
+          bytes = await viaOffice();
         } catch (officeError) {
           if (!graph.graphConfigured) throw officeError;
           // Outlook mobile : la lecture native échoue (erreur 3001), Graph prend le relais.
           officeReadBroken.current = true;
-          bytes = await graph.readAttachmentViaGraph(a);
+          try {
+            bytes = await viaGraph();
+          } catch (graphError) {
+            throw new Error(`Outlook : ${(officeError as Error)?.message ?? officeError} · Graph : ${(graphError as Error)?.message ?? graphError}`);
+          }
         }
       }
       await openWithBytes(a, bytes);

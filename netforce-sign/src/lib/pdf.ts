@@ -9,9 +9,44 @@ import { dataUrlToBytes, loadImage } from './util';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
-export async function openPdf(bytes: ArrayBuffer): Promise<PDFDocumentProxy> {
+/** Vrai si les octets ressemblent à un PDF (l'en-tête « %PDF » peut être précédé de quelques octets). */
+export function looksLikePdf(bytes: ArrayBuffer): boolean {
+  const head = new Uint8Array(bytes, 0, Math.min(bytes.byteLength, 1024));
+  for (let i = 0; i + 4 <= head.length; i++) {
+    if (head[i] === 0x25 && head[i + 1] === 0x50 && head[i + 2] === 0x44 && head[i + 3] === 0x46) return true;
+  }
+  return false;
+}
+
+/** Début du contenu, lisible, pour comprendre ce qui a été reçu à la place d'un PDF. */
+export function describeBytes(bytes: ArrayBuffer): string {
+  const head = new Uint8Array(bytes, 0, Math.min(bytes.byteLength, 24));
+  const text = Array.from(head, (b) => (b >= 0x20 && b < 0x7f ? String.fromCharCode(b) : '·')).join('');
+  return `${bytes.byteLength} octets, début « ${text} »`;
+}
+
+async function load(bytes: ArrayBuffer) {
   // pdf.js transfère le buffer au worker : on lui donne une copie.
   return pdfjs.getDocument({ data: new Uint8Array(bytes.slice(0)) }).promise;
+}
+
+let mainThread = false;
+
+export async function openPdf(bytes: ArrayBuffer): Promise<PDFDocumentProxy> {
+  if (!looksLikePdf(bytes)) throw new Error(`le fichier reçu n’est pas un PDF (${describeBytes(bytes)})`);
+  try {
+    return await load(bytes);
+  } catch (first) {
+    if (mainThread || (first as Error)?.name === 'PasswordException') throw first;
+    // Certaines vues web (Outlook mobile) bloquent le worker : on charge le moteur dans la page et on réessaie.
+    mainThread = true;
+    await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
+    try {
+      return await load(bytes);
+    } catch {
+      throw first;
+    }
+  }
 }
 
 export async function getPageSizes(pdf: PDFDocumentProxy): Promise<PageSize[]> {
