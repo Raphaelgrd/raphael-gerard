@@ -189,10 +189,13 @@ function renderRank() {
   const rows = PLAYERS.map((p) => ({ ...p, ...(r.players[p.id] ?? { overall: null as number | null, cats: {} as Record<string, number>, count: 0 }) }))
     .filter((p) => p.overall != null)
     .sort((a, b) => b.overall! - a.overall!);
-  const leaders = CATS.map((c) => {
-    const best = rows.filter((p) => p.cats?.[c.id] != null).sort((a, b) => b.cats[c.id] - a.cats[c.id])[0];
-    return `<div class="leader"><div class="k">${c.name}</div><div class="v">${best ? esc(best.name) : '–'} <span class="n">${best ? fmt(best.cats[c.id]) : ''}</span></div></div>`;
-  }).join('');
+  const extremes = (worst: boolean) =>
+    CATS.map((c) => {
+      const pick = rows
+        .filter((p) => p.cats?.[c.id] != null)
+        .sort((a, b) => (worst ? a.cats[c.id] - b.cats[c.id] : b.cats[c.id] - a.cats[c.id]))[0];
+      return `<div class="leader${worst ? ' worst' : ''}"><div class="k">${c.name}</div><div class="v">${pick ? esc(pick.name) : '–'} <span class="n">${pick ? fmt(pick.cats[c.id]) : ''}</span></div></div>`;
+    }).join('');
   return `<section style="display:flex;flex-direction:column;gap:14px">
     <div><h2>Classement général</h2><p class="muted small">${r.voters} votant${r.voters > 1 ? 's' : ''} · moyenne des six gestes${r.updatedAt ? ` · dernier vote ${when(r.updatedAt)}` : ''}</p></div>
     <ol class="rank-list">${rows
@@ -207,7 +210,9 @@ function renderRank() {
       )
       .join('')}</ol>
     <h3>Meilleur par geste</h3>
-    <div class="leaders">${leaders}</div>
+    <div class="leaders">${extremes(false)}</div>
+    <h3>Le plus nul par geste</h3>
+    <div class="leaders">${extremes(true)}</div>
   </section>`;
 }
 
