@@ -47,6 +47,7 @@ Durée : environ 15 minutes. Il faut deux comptes gratuits : **Supabase** (la ba
 - **Tes potes** : envoie-leur l'adresse du site. Chacun choisit son nom, note les 5 autres joueurs et envoie. Il peut revenir modifier ses notes depuis le même téléphone et le même navigateur.
 - **Le classement** est public et se met à jour à chaque vote. Il ne montre que des moyennes.
 - **L'onglet « Détails »** est public lui aussi : tout le monde y voit qui a mis quelle note et tous les commentaires. L'écran de vote le signale avant qu'on note.
+- **La rubrique « Commentaires »** : une fiche repliable par joueur, avec les commentaires reçus rangés par geste (et ses commentaires sur lui-même à la fin). Des boutons permettent de n'afficher qu'un geste.
 - **L'onglet « Auto-notes »** : chacun peut se noter lui-même, à part. Ces notes ont leur propre classement, comparé à la moyenne donnée par les autres, et ne comptent jamais dans le classement général. Pour supprimer une auto-note, ouvre la table `self_votes` dans Supabase (**Table Editor**).
 - **Les coulisses** s'ouvrent avec l'adresse suivie de `#coulisses` (par exemple `https://notes-volley.vercel.app/#coulisses`). Connecte-toi avec ton compte admin pour voir :
   - qui a voté, et quand ;

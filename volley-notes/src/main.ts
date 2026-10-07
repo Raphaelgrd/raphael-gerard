@@ -78,7 +78,7 @@ function deviceToken(): string {
 const TOKEN = deviceToken();
 
 const S = {
-  tab: 'vote' as 'vote' | 'rank' | 'details' | 'self' | 'admin',
+  tab: 'vote' as 'vote' | 'rank' | 'details' | 'self' | 'comments' | 'admin',
   stage: 'who' as 'who' | 'rate' | 'done',
   me: null as string | null,
   step: 0,
@@ -103,6 +103,9 @@ const S = {
   selfVotes: [] as SelfVote[],
   selfState: 'loading' as 'loading' | 'ready' | 'error',
   selfSaving: false,
+  // Rubrique Commentaires
+  commentCat: 'all',
+  openFiches: new Set<string>(),
   confirmDelete: null as string | null,
   loginError: '',
 };
@@ -131,6 +134,7 @@ function render() {
   else if (S.tab === 'rank') view.innerHTML = renderRank();
   else if (S.tab === 'details') view.innerHTML = renderPublic();
   else if (S.tab === 'self') view.innerHTML = renderSelf();
+  else if (S.tab === 'comments') view.innerHTML = renderComments();
   else view.innerHTML = S.isAdmin ? renderAdmin() : renderLogin();
 }
 
@@ -314,11 +318,6 @@ function renderSelfRanking() {
   if (!rows.length) {
     return `<div><h2>Classement des auto-notes</h2><p class="muted">Personne ne s'est encore noté.</p></div>`;
   }
-  const comments = rows.flatMap((x) =>
-    Object.entries(x.v.notes ?? {})
-      .filter(([, t]) => t)
-      .map(([c, t]) => ({ who: x.v.voter, cat: CATS.find((k) => k.id === c)?.name ?? c, score: x.v.ratings[c], t })),
-  );
   return `<div><h2>Classement des auto-notes</h2><p class="muted small">Comment chacun se note, comparé à la moyenne que lui donnent les autres. Écart rouge : il se surestime.</p></div>
     <ol class="rank-list">${rows
       .map(
@@ -334,13 +333,74 @@ function renderSelfRanking() {
     </li>`,
       )
       .join('')}</ol>
-    ${
-      comments.length
-        ? `<h3>Ce qu'ils disent d'eux-mêmes</h3><div class="comments">${comments
-            .map((c) => `<div class="comment"><div class="meta">${esc(pName(c.who))} · ${esc(c.cat)} ${c.score}/10</div>${esc(c.t)}</div>`)
-            .join('')}</div>`
-        : ''
-    }`;
+    <p class="muted small">Ce qu'ils disent d'eux-mêmes est dans la rubrique « Commentaires ».</p>`;
+}
+
+/** Rubrique Commentaires : une fiche repliable par joueur, commentaires rangés par geste. */
+function renderComments() {
+  if (S.publicState !== 'ready' && !S.publicVotes.length) {
+    const msg = S.publicState === 'loading' ? 'Chargement des commentaires…' : 'Impossible de charger les commentaires. Vérifie ta connexion puis réessaie.';
+    return `<section class="panel"><h2>Commentaires</h2><p class="muted">${msg}</p>${configNotice()}</section>`;
+  }
+  type Entry = { from: string; score?: number; txt: string };
+  const cats = CATS.filter((c) => S.commentCat === 'all' || c.id === S.commentCat);
+  // Une seule auto-note par joueur : la plus récente.
+  const selfByVoter = new Map<string, SelfVote>();
+  S.selfVotes.forEach((v) => selfByVoter.set(v.voter, v));
+
+  const fiches = PLAYERS.map((p) => {
+    const groups = cats
+      .map((c) => {
+        const entries: Entry[] = [];
+        S.publicVotes.forEach((v) => {
+          const txt = v.notes?.[p.id]?.[c.id];
+          if (txt) entries.push({ from: v.voter, score: v.ratings?.[p.id]?.[c.id], txt });
+        });
+        return { cat: c, entries };
+      })
+      .filter((g) => g.entries.length);
+    const self = selfByVoter.get(p.id);
+    const selfEntries = cats
+      .filter((c) => self?.notes?.[c.id])
+      .map((c) => ({ cat: c, score: self!.ratings[c.id], txt: self!.notes[c.id] }));
+    const count = groups.reduce((n, g) => n + g.entries.length, 0) + selfEntries.length;
+    return { p, groups, selfEntries, count };
+  });
+  const total = fiches.reduce((n, f) => n + f.count, 0);
+
+  const filters = [{ id: 'all', name: 'Tous' }, ...CATS]
+    .map((c) => `<button class="filter" data-act="comment-cat" data-cat="${c.id}" aria-pressed="${S.commentCat === c.id}">${c.name}</button>`)
+    .join('');
+
+  return `<section style="display:flex;flex-direction:column;gap:14px">
+    <div><h2>Commentaires</h2><p class="muted small">Ce que chacun a écrit, rangé par joueur noté puis par geste. Touche un nom pour ouvrir sa fiche.</p></div>
+    <div class="filters">${filters}</div>
+    ${total ? '' : `<p class="muted">Aucun commentaire${S.commentCat === 'all' ? '' : ' sur ce geste'} pour l'instant.</p>`}
+    <div class="fiches">${fiches
+      .map((f) => {
+        if (!f.count) return `<div class="fiche empty"><span class="who">${esc(f.p.name)}</span><span class="muted small">aucun</span></div>`;
+        return `<details class="fiche" data-fiche="${f.p.id}" ${S.openFiches.has(f.p.id) ? 'open' : ''}>
+          <summary><span class="who">${esc(f.p.name)}</span><span class="count">${f.count} commentaire${f.count > 1 ? 's' : ''}</span></summary>
+          <div class="fiche-body">
+            ${f.groups
+              .map(
+                (g) => `<div class="cgroup"><div class="cgroup-title">${g.cat.name}</div>${g.entries
+                  .map((e) => `<div class="centry"><div class="meta">${esc(pName(e.from))} · ${e.score ?? '–'}/10</div><p>${esc(e.txt)}</p></div>`)
+                  .join('')}</div>`,
+              )
+              .join('')}
+            ${
+              f.selfEntries.length
+                ? `<div class="cgroup self"><div class="cgroup-title">Auto-note</div>${f.selfEntries
+                    .map((e) => `<div class="centry"><div class="meta">${esc(f.p.name)} sur lui-même · ${e.cat.name} ${e.score}/10</div><p>${esc(e.txt)}</p></div>`)
+                    .join('')}</div>`
+                : ''
+            }
+          </div>
+        </details>`;
+      })
+      .join('')}</div>
+  </section>`;
 }
 
 function renderLogin() {
@@ -427,17 +487,28 @@ function renderDetails(votes: Vote[], admin: boolean) {
         ? `<div class="row"><div class="grow"><span class="eyebrow">Visible par toi seul</span><h2>Coulisses</h2></div>
       <button class="btn ghost" data-act="reload">Actualiser</button>
       <button class="btn ghost" data-act="logout">Déconnexion</button></div>`
-        : `<div><h2>Détail des votes</h2><p class="muted small">Toutes les notes et tous les commentaires, avec qui les a mis.</p></div>`
+        : `<div><h2>Détail des votes</h2><p class="muted small">Toutes les notes, avec qui les a mises.</p></div>`
     }
     <div class="voters">${chips}</div>
     ${admin && dupes.length ? `<div class="notice">Plusieurs votes sous le nom ${dupes.map((p) => esc(p.name)).join(', ')}. Ils comptent tous dans le classement : supprime ceux qui sont en trop.</div>` : ''}
     ${votes.length ? `<div class="scroll"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>${detail}` : `<p class="muted">Aucun vote pour l'instant.</p>`}
-    <h3>Tous les commentaires</h3>
+    ${
+      admin
+        ? `<h3>Commentaires par auteur</h3>
     <div class="comments">${
       comments.length
-        ? comments.map((c) => `<div class="comment"><div class="meta">${esc(pName(c.from))} → ${esc(pName(c.to))} · ${esc(c.cat)} ${c.score ?? ''}/10</div>${esc(c.txt)}</div>`).join('')
+        ? PLAYERS.filter((p) => comments.some((c) => c.from === p.id))
+            .map(
+              (p) => `<div class="cgroup"><div class="cgroup-title">${esc(p.name)} a écrit</div>${comments
+                .filter((c) => c.from === p.id)
+                .map((c) => `<div class="comment"><div class="meta">sur ${esc(pName(c.to))} · ${esc(c.cat)} ${c.score ?? ''}/10</div>${esc(c.txt)}</div>`)
+                .join('')}</div>`,
+            )
+            .join('')
         : `<p class="muted small">Aucun commentaire pour l'instant.</p>`
-    }</div>
+    }</div>`
+        : `<p class="muted small">Les commentaires sont dans la rubrique « Commentaires ».</p>`
+    }
   </section>`;
 }
 
@@ -571,6 +642,7 @@ function goTab(tab: typeof S.tab) {
   S.sel = null;
   if (tab === 'rank') loadRanking().then(() => S.tab === 'rank' && render());
   if (tab === 'details') loadPublicVotes().then(() => S.tab === 'details' && render());
+  if (tab === 'comments') Promise.all([loadPublicVotes(), loadSelfVotes()]).then(() => S.tab === 'comments' && render());
   if (tab === 'self') {
     // Préremplit le nom avec celui choisi pour voter, s'il y en a un.
     if (!S.selfMe && S.me && S.selfStage === 'who') S.selfMe = S.me;
@@ -603,6 +675,17 @@ view.addEventListener('input', (e) => {
     S.notes[t][el.dataset.note] = el.value.slice(0, 500);
   }
 });
+
+view.addEventListener(
+  'toggle',
+  (e) => {
+    const d = e.target as HTMLDetailsElement;
+    if (!d.dataset?.fiche) return;
+    if (d.open) S.openFiches.add(d.dataset.fiche);
+    else S.openFiches.delete(d.dataset.fiche);
+  },
+  true,
+);
 
 view.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -646,7 +729,10 @@ view.addEventListener('click', async (e) => {
     S.step = 0;
     render();
   } else if (act === 'submit') submit();
-  else if (act === 'self-pick') {
+  else if (act === 'comment-cat') {
+    S.commentCat = b.dataset.cat!;
+    render();
+  } else if (act === 'self-pick') {
     S.selfMe = b.dataset.id!;
     render();
   } else if (act === 'self-start' || act === 'self-edit') {
