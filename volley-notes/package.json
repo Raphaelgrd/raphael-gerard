@@ -1,0 +1,20 @@
+{
+  "name": "volley-notes",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource/big-shoulders-display": "^5.3.0",
+    "@fontsource/figtree": "^5.3.0",
+    "@supabase/supabase-js": "^2.117.2"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3"
+  }
+}
