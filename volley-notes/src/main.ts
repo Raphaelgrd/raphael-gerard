@@ -47,6 +47,14 @@ interface Vote {
   updated_at: string;
 }
 
+interface SelfVote {
+  id: string;
+  voter: string;
+  ratings: Record<string, number>;
+  notes: Record<string, string>;
+  updated_at: string;
+}
+
 const pName = (id: string) => PLAYERS.find((p) => p.id === id)?.name ?? id;
 const esc = (s: unknown) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -70,7 +78,7 @@ function deviceToken(): string {
 const TOKEN = deviceToken();
 
 const S = {
-  tab: 'vote' as 'vote' | 'rank' | 'details' | 'admin',
+  tab: 'vote' as 'vote' | 'rank' | 'details' | 'self' | 'admin',
   stage: 'who' as 'who' | 'rate' | 'done',
   me: null as string | null,
   step: 0,
@@ -86,6 +94,15 @@ const S = {
   publicVotes: [] as Vote[],
   publicState: 'loading' as 'loading' | 'ready' | 'error',
   sel: null as { key: string; target: string } | null,
+  // Auto-notes (onglet séparé, hors classement général)
+  selfStage: 'who' as 'who' | 'rate' | 'done',
+  selfMe: null as string | null,
+  selfScores: Object.fromEntries(CATS.map((c) => [c.id, 5])) as Record<string, number>,
+  selfNotes: {} as Record<string, string>,
+  selfOpenNotes: {} as Record<string, boolean>,
+  selfVotes: [] as SelfVote[],
+  selfState: 'loading' as 'loading' | 'ready' | 'error',
+  selfSaving: false,
   confirmDelete: null as string | null,
   loginError: '',
 };
@@ -113,6 +130,7 @@ function render() {
   if (S.tab === 'vote') view.innerHTML = renderVote();
   else if (S.tab === 'rank') view.innerHTML = renderRank();
   else if (S.tab === 'details') view.innerHTML = renderPublic();
+  else if (S.tab === 'self') view.innerHTML = renderSelf();
   else view.innerHTML = S.isAdmin ? renderAdmin() : renderLogin();
 }
 
@@ -220,6 +238,109 @@ function renderRank() {
     <h3>Le plus nul par geste</h3>
     <div class="leaders">${extremes(true)}</div>
   </section>`;
+}
+
+function renderSelf() {
+  return `<section style="display:flex;flex-direction:column;gap:14px">
+    ${renderSelfForm()}
+    ${renderSelfRanking()}
+  </section>`;
+}
+
+function renderSelfForm() {
+  if (S.selfStage === 'who') {
+    return `<section class="panel">
+      <span class="eyebrow">Hors classement général</span>
+      <h2>Auto-note</h2>
+      <p class="muted small">Note-toi toi-même sur les six gestes. Ça a son propre classement, à part, et c'est visible par tout le monde.</p>
+      ${configNotice()}
+      <div class="names">${PLAYERS.map((p) => `<button data-act="self-pick" data-id="${p.id}" aria-pressed="${S.selfMe === p.id}">${esc(p.name)}</button>`).join('')}</div>
+      <button class="btn" data-act="self-start" ${S.selfMe ? '' : 'disabled'}>Me noter</button>
+    </section>`;
+  }
+  if (S.selfStage === 'done') {
+    return `<section class="panel">
+      <span class="eyebrow">Auto-note enregistrée</span>
+      <h2>${esc(pName(S.selfMe!))} · ${fmt(avg(Object.values(S.selfScores)))}</h2>
+      <p class="muted">Ton auto-note est dans le classement ci-dessous. Tu peux la modifier quand tu veux depuis ce téléphone.</p>
+      <div class="row"><button class="btn ghost" data-act="self-edit">Modifier mon auto-note</button></div>
+    </section>`;
+  }
+  const sc = S.selfScores;
+  return `<section class="panel">
+    <div class="player-head">
+      <div><span class="eyebrow">Auto-note · à part</span><h2>Et toi, ${esc(pName(S.selfMe!))} ?</h2></div>
+      <div class="avg" id="avg">${fmt(avg(Object.values(sc)))}<small>/10</small></div>
+    </div>
+    <div>${CATS.map((c) => {
+      const note = S.selfNotes[c.id] || '';
+      const open = S.selfOpenNotes[c.id] || note;
+      return `<div class="cat">
+        <div class="cat-top">
+          <label class="cat-name" for="r-${c.id}">${c.name}<small>${c.hint}</small></label>
+          <div class="score"><span id="v-${c.id}">${sc[c.id]}</span><small>/10</small></div>
+        </div>
+        <input type="range" id="r-${c.id}" min="0" max="10" step="1" value="${sc[c.id]}" data-cat="${c.id}">
+        <div class="ticks" aria-hidden="true">${Array.from({ length: 11 }, (_, i) => `<span>${i}</span>`).join('')}</div>
+        ${
+          open
+            ? `<textarea id="n-self-${c.id}" data-note="${c.id}" maxlength="500" placeholder="Commentaire sur ${esc(c.name.toLowerCase())} (facultatif)">${esc(note)}</textarea>`
+            : `<button class="note-toggle" data-act="self-note" data-cat="${c.id}">+ Ajouter un commentaire</button>`
+        }
+      </div>`;
+    }).join('')}</div>
+    <div class="row">
+      <button class="btn ghost" data-act="self-back">Changer de nom</button>
+      <button class="btn grow" data-act="self-submit" ${S.selfSaving || !supabase ? 'disabled' : ''}>${S.selfSaving ? 'Envoi…' : 'Enregistrer'}</button>
+    </div>
+  </section>`;
+}
+
+/** Classement des auto-notes, comparé à la moyenne que donnent les autres (classement général). */
+function renderSelfRanking() {
+  if (S.selfState !== 'ready' && !S.selfVotes.length) {
+    return `<p class="muted">${S.selfState === 'loading' ? 'Chargement des auto-notes…' : 'Impossible de charger les auto-notes. Vérifie ta connexion puis réessaie.'}</p>`;
+  }
+  // Une seule auto-note par joueur : la plus récente (la liste arrive triée par date).
+  const latest = new Map<string, SelfVote>();
+  S.selfVotes.forEach((v) => latest.set(v.voter, v));
+  const rows = [...latest.values()]
+    .map((v) => {
+      const self = ratingAvg(v.ratings)!;
+      const others = S.ranking?.players?.[v.voter]?.overall ?? null;
+      return { v, self, others, gap: others == null ? null : self - others };
+    })
+    .sort((a, b) => b.self - a.self);
+  if (!rows.length) {
+    return `<div><h2>Classement des auto-notes</h2><p class="muted">Personne ne s'est encore noté.</p></div>`;
+  }
+  const comments = rows.flatMap((x) =>
+    Object.entries(x.v.notes ?? {})
+      .filter(([, t]) => t)
+      .map(([c, t]) => ({ who: x.v.voter, cat: CATS.find((k) => k.id === c)?.name ?? c, score: x.v.ratings[c], t })),
+  );
+  return `<div><h2>Classement des auto-notes</h2><p class="muted small">Comment chacun se note, comparé à la moyenne que lui donnent les autres. Écart rouge : il se surestime.</p></div>
+    <ol class="rank-list">${rows
+      .map(
+        (x, i) => `<li class="rank self-rank ${i === 0 ? 'first' : ''}">
+      <div class="pos">${i + 1}</div>
+      <div style="min-width:0"><div class="who">${esc(pName(x.v.voter))}</div>
+        <div class="small muted">Les autres : ${x.others == null ? '–' : fmt(x.others)}${
+          x.gap == null ? '' : ` · <span class="gap ${x.gap > 0 ? 'up' : 'down'}">${x.gap > 0 ? '+' : ''}${fmt(x.gap)}</span>`
+        }</div>
+        <div class="bars">${CATS.map((c) => `<div class="bar" title="${c.name} ${x.v.ratings[c.id]}"><i><b style="width:${(x.v.ratings[c.id] || 0) * 10}%"></b></i><span>${c.short} ${x.v.ratings[c.id]}</span></div>`).join('')}</div>
+      </div>
+      <div class="val">${fmt(x.self)}</div>
+    </li>`,
+      )
+      .join('')}</ol>
+    ${
+      comments.length
+        ? `<h3>Ce qu'ils disent d'eux-mêmes</h3><div class="comments">${comments
+            .map((c) => `<div class="comment"><div class="meta">${esc(pName(c.who))} · ${esc(c.cat)} ${c.score}/10</div>${esc(c.t)}</div>`)
+            .join('')}</div>`
+        : ''
+    }`;
 }
 
 function renderLogin() {
@@ -358,6 +479,50 @@ async function loadPublicVotes() {
   }
 }
 
+async function loadSelfVotes() {
+  if (!supabase) {
+    S.selfState = 'error';
+    return;
+  }
+  const { data, error } = await supabase.rpc('get_self_votes');
+  if (error) S.selfState = 'error';
+  else {
+    S.selfVotes = (data ?? []) as SelfVote[];
+    S.selfState = 'ready';
+  }
+}
+
+async function loadMySelfVote() {
+  if (!supabase) return;
+  const { data } = await supabase.rpc('get_my_self_vote', { p_token: TOKEN });
+  if (!data) return;
+  const d = data as { voter: string; ratings: Record<string, number>; notes: Record<string, string> };
+  S.selfMe = d.voter;
+  S.selfScores = { ...d.ratings };
+  S.selfNotes = { ...(d.notes ?? {}) };
+  if (S.selfStage === 'who') S.selfStage = 'done';
+}
+
+async function submitSelf() {
+  if (!supabase || !S.selfMe) return;
+  S.selfSaving = true;
+  render();
+  const notes = Object.fromEntries(
+    Object.entries(S.selfNotes)
+      .map(([k, v]) => [k, v.trim()] as const)
+      .filter(([, v]) => v),
+  );
+  const { error } = await supabase.rpc('submit_self_vote', { p_token: TOKEN, p_voter: S.selfMe, p_ratings: S.selfScores, p_notes: notes });
+  S.selfSaving = false;
+  if (error) toast("L'envoi a échoué. Vérifie ta connexion puis réessaie.");
+  else {
+    S.selfStage = 'done';
+    toast('Auto-note enregistrée');
+    await loadSelfVotes();
+  }
+  render();
+}
+
 async function loadAdmin() {
   if (!supabase || !S.session) {
     S.isAdmin = false;
@@ -406,6 +571,11 @@ function goTab(tab: typeof S.tab) {
   S.sel = null;
   if (tab === 'rank') loadRanking().then(() => S.tab === 'rank' && render());
   if (tab === 'details') loadPublicVotes().then(() => S.tab === 'details' && render());
+  if (tab === 'self') {
+    // Préremplit le nom avec celui choisi pour voter, s'il y en a un.
+    if (!S.selfMe && S.me && S.selfStage === 'who') S.selfMe = S.me;
+    Promise.all([loadSelfVotes(), loadRanking()]).then(() => S.tab === 'self' && S.selfStage !== 'rate' && render());
+  }
   render();
 }
 
@@ -416,6 +586,14 @@ document.getElementById('tabs')!.addEventListener('click', (e) => {
 
 view.addEventListener('input', (e) => {
   const el = e.target as HTMLInputElement;
+  if (S.tab === 'self') {
+    if (el.dataset.cat) {
+      S.selfScores[el.dataset.cat] = Number(el.value);
+      document.getElementById(`v-${el.dataset.cat}`)!.textContent = el.value;
+      document.getElementById('avg')!.innerHTML = `${fmt(avg(Object.values(S.selfScores)))}<small>/10</small>`;
+    } else if (el.dataset.note) S.selfNotes[el.dataset.note] = el.value.slice(0, 500);
+    return;
+  }
   const t = targets()[S.step]?.id;
   if (el.dataset.cat) {
     S.scores[t][el.dataset.cat] = Number(el.value);
@@ -468,6 +646,21 @@ view.addEventListener('click', async (e) => {
     S.step = 0;
     render();
   } else if (act === 'submit') submit();
+  else if (act === 'self-pick') {
+    S.selfMe = b.dataset.id!;
+    render();
+  } else if (act === 'self-start' || act === 'self-edit') {
+    S.selfStage = 'rate';
+    render();
+    scrollTo(0, 0);
+  } else if (act === 'self-back') {
+    S.selfStage = 'who';
+    render();
+  } else if (act === 'self-note') {
+    S.selfOpenNotes[b.dataset.cat!] = true;
+    render();
+    document.getElementById(`n-self-${b.dataset.cat}`)?.focus();
+  } else if (act === 'self-submit') submitSelf();
   else if (act === 'reload') {
     await Promise.all([loadRanking(), loadAdmin(), S.tab === 'details' ? loadPublicVotes() : null]);
     render();
@@ -510,6 +703,6 @@ render();
       });
     });
   }
-  await Promise.all([loadMyVote(), loadRanking()]);
+  await Promise.all([loadMyVote(), loadMySelfVote(), loadRanking()]);
   if (!(S.tab === 'vote' && S.stage === 'rate')) render();
 })();
