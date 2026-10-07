@@ -38,7 +38,7 @@ p { margin: 0 }
 
 header { display: flex; flex-direction: column; gap: 6px }
 .tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 4px; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5 }
-.tabs button { flex: 1; border: 0; background: transparent; color: var(--muted); font: 600 .95rem var(--body); padding: 10px 6px; border-radius: 9px; cursor: pointer }
+.tabs button { flex: 1; min-width: 0; white-space: nowrap; border: 0; background: transparent; color: var(--muted); font: 600 .84rem var(--body); padding: 10px 2px; border-radius: 9px; cursor: pointer }
 .tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink) }
 button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--wood); outline-offset: 2px }
 
@@ -126,3 +126,7 @@ body { margin: 0 }
 .field input { border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; font: 1rem var(--body); background: var(--bg); color: var(--ink) }
 .danger { color: var(--bad); background: none; border: 0; font: 600 .85rem var(--body); cursor: pointer; padding: 0 }
 .admin-link { align-self: center; font-size: .8rem; color: var(--muted); text-decoration: none }
+.gap { font-weight: 700; font-variant-numeric: tabular-nums }
+.gap.up { color: var(--bad) }
+.gap.down { color: var(--good) }
+.self-rank .bar span { text-transform: none }
