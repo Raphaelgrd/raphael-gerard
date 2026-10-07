@@ -38,7 +38,9 @@ interface Ranking {
   players: Record<string, { overall: number; cats: Record<string, number>; count: number }>;
 }
 interface Vote {
-  token: string;
+  /** Identifiant d'affichage : le jeton côté admin, un identifiant public sinon. */
+  key: string;
+  token?: string;
   voter: string;
   ratings: Scores;
   notes: Notes;
@@ -68,7 +70,7 @@ function deviceToken(): string {
 const TOKEN = deviceToken();
 
 const S = {
-  tab: 'vote' as 'vote' | 'rank' | 'admin',
+  tab: 'vote' as 'vote' | 'rank' | 'details' | 'admin',
   stage: 'who' as 'who' | 'rate' | 'done',
   me: null as string | null,
   step: 0,
@@ -81,7 +83,9 @@ const S = {
   session: null as Session | null,
   isAdmin: false,
   votes: [] as Vote[],
-  sel: null as { token: string; target: string } | null,
+  publicVotes: [] as Vote[],
+  publicState: 'loading' as 'loading' | 'ready' | 'error',
+  sel: null as { key: string; target: string } | null,
   confirmDelete: null as string | null,
   loginError: '',
 };
@@ -108,6 +112,7 @@ function render() {
   document.getElementById('tab-admin')!.hidden = !(S.isAdmin || S.tab === 'admin');
   if (S.tab === 'vote') view.innerHTML = renderVote();
   else if (S.tab === 'rank') view.innerHTML = renderRank();
+  else if (S.tab === 'details') view.innerHTML = renderPublic();
   else view.innerHTML = S.isAdmin ? renderAdmin() : renderLogin();
 }
 
@@ -120,6 +125,7 @@ function renderVote() {
     return `<section class="panel">
       <h2>Qui es-tu ?</h2>
       <p class="muted small">Choisis ton nom. Tu noteras ensuite les ${PLAYERS.length - 1} autres joueurs.</p>
+      <div class="notice small">Tes notes et tes commentaires seront visibles par tout le monde, avec ton nom, dans l'onglet « Détails ».</div>
       ${configNotice()}
       <div class="names">${PLAYERS.map((p) => `<button data-act="pick" data-id="${p.id}" aria-pressed="${S.me === p.id}">${esc(p.name)}</button>`).join('')}</div>
       <button class="btn" data-act="start" ${S.me ? '' : 'disabled'}>Commencer à noter</button>
@@ -233,8 +239,19 @@ function renderLogin() {
 
 const ratingAvg = (r?: Record<string, number>) => (r ? avg(CATS.map((c) => r[c.id]).filter((v) => typeof v === 'number')) : null);
 
+function renderPublic() {
+  if (S.publicState !== 'ready' && !S.publicVotes.length) {
+    const msg = S.publicState === 'loading' ? 'Chargement des votes…' : 'Impossible de charger les votes. Vérifie ta connexion puis réessaie.';
+    return `<section class="panel"><h2>Détail des votes</h2><p class="muted">${msg}</p>${configNotice()}</section>`;
+  }
+  return renderDetails(S.publicVotes, false);
+}
+
 function renderAdmin() {
-  const votes = S.votes;
+  return renderDetails(S.votes, true);
+}
+
+function renderDetails(votes: Vote[], admin: boolean) {
   const chips = PLAYERS.map((p) => {
     const v = votes.filter((x) => x.voter === p.id);
     return v.length
@@ -242,27 +259,29 @@ function renderAdmin() {
       : `<span class="chip missing">${esc(p.name)} n'a pas voté</span>`;
   }).join('');
   const dupes = PLAYERS.filter((p) => votes.filter((v) => v.voter === p.id).length > 1);
-  const head = `<tr><th class="rowh">Votant ↓ / Noté →</th>${PLAYERS.map((p) => `<th>${esc(p.name)}</th>`).join('')}<th></th></tr>`;
+  const head = `<tr><th class="rowh">Votant ↓ / Noté →</th>${PLAYERS.map((p) => `<th>${esc(p.name)}</th>`).join('')}${admin ? '<th></th>' : ''}</tr>`;
   const body = votes
     .map(
       (v) => `<tr><th class="rowh">${esc(pName(v.voter))}</th>${PLAYERS.map((p) => {
         if (p.id === v.voter) return `<td class="self">—</td>`;
         const a = ratingAvg(v.ratings?.[p.id]);
         if (a == null) return `<td class="muted">·</td>`;
-        const sel = S.sel?.token === v.token && S.sel.target === p.id;
+        const sel = S.sel?.key === v.key && S.sel.target === p.id;
         const hasNote = Object.values(v.notes?.[p.id] ?? {}).some(Boolean);
-        return `<td class="cell"><button style="--pct:${Math.round(a * 6)}%" class="${sel ? 'sel' : ''}" data-act="cell" data-token="${v.token}" data-target="${p.id}">${fmt(a)}${hasNote ? '*' : ''}</button></td>`;
-      }).join('')}<td>${
-        S.confirmDelete === v.token
-          ? `<button class="danger" data-act="delete-yes" data-token="${v.token}">Confirmer</button> · <button class="danger" style="color:var(--muted)" data-act="delete-no">Annuler</button>`
-          : `<button class="danger" data-act="delete" data-token="${v.token}">Supprimer</button>`
-      }</td></tr>`,
+        return `<td class="cell"><button style="--pct:${Math.round(a * 6)}%" class="${sel ? 'sel' : ''}" data-act="cell" data-key="${esc(v.key)}" data-target="${p.id}">${fmt(a)}${hasNote ? '*' : ''}</button></td>`;
+      }).join('')}${
+        !admin
+          ? ''
+          : S.confirmDelete === v.token
+          ? `<td><button class="danger" data-act="delete-yes" data-token="${v.token}">Confirmer</button> · <button class="danger" style="color:var(--muted)" data-act="delete-no">Annuler</button></td>`
+          : `<td><button class="danger" data-act="delete" data-token="${v.token}">Supprimer</button></td>`
+      }</tr>`,
     )
     .join('');
 
   let detail = `<p class="muted small">Touche une case du tableau pour voir le détail. Une * signale un commentaire.</p>`;
   if (S.sel) {
-    const v = votes.find((x) => x.token === S.sel!.token);
+    const v = votes.find((x) => x.key === S.sel!.key);
     const r = v?.ratings?.[S.sel.target];
     const n = v?.notes?.[S.sel.target] ?? {};
     if (v && r)
@@ -282,11 +301,15 @@ function renderAdmin() {
   );
 
   return `<section style="display:flex;flex-direction:column;gap:14px">
-    <div class="row"><div class="grow"><span class="eyebrow">Visible par toi seul</span><h2>Coulisses</h2></div>
+    ${
+      admin
+        ? `<div class="row"><div class="grow"><span class="eyebrow">Visible par toi seul</span><h2>Coulisses</h2></div>
       <button class="btn ghost" data-act="reload">Actualiser</button>
-      <button class="btn ghost" data-act="logout">Déconnexion</button></div>
+      <button class="btn ghost" data-act="logout">Déconnexion</button></div>`
+        : `<div><h2>Détail des votes</h2><p class="muted small">Toutes les notes et tous les commentaires, avec qui les a mis.</p></div>`
+    }
     <div class="voters">${chips}</div>
-    ${dupes.length ? `<div class="notice">Plusieurs votes sous le nom ${dupes.map((p) => esc(p.name)).join(', ')}. Ils comptent tous dans le classement : supprime ceux qui sont en trop.</div>` : ''}
+    ${admin && dupes.length ? `<div class="notice">Plusieurs votes sous le nom ${dupes.map((p) => esc(p.name)).join(', ')}. Ils comptent tous dans le classement : supprime ceux qui sont en trop.</div>` : ''}
     ${votes.length ? `<div class="scroll"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>${detail}` : `<p class="muted">Aucun vote pour l'instant.</p>`}
     <h3>Tous les commentaires</h3>
     <div class="comments">${
@@ -322,6 +345,19 @@ async function loadMyVote() {
   if (S.stage === 'who') S.stage = 'done';
 }
 
+async function loadPublicVotes() {
+  if (!supabase) {
+    S.publicState = 'error';
+    return;
+  }
+  const { data, error } = await supabase.rpc('get_all_votes');
+  if (error) S.publicState = 'error';
+  else {
+    S.publicVotes = ((data ?? []) as (Vote & { id: string })[]).map((v) => ({ ...v, key: v.id }));
+    S.publicState = 'ready';
+  }
+}
+
 async function loadAdmin() {
   if (!supabase || !S.session) {
     S.isAdmin = false;
@@ -332,7 +368,7 @@ async function loadAdmin() {
   if (!S.isAdmin) return;
   const { data, error } = await supabase.from('votes').select('token, voter, ratings, notes, updated_at').order('updated_at');
   if (error) toast('Impossible de charger les votes.');
-  else S.votes = (data ?? []) as Vote[];
+  else S.votes = ((data ?? []) as Vote[]).map((v) => ({ ...v, key: v.token! }));
 }
 
 async function submit() {
@@ -367,7 +403,9 @@ async function submit() {
 /* ---------- événements ---------- */
 function goTab(tab: typeof S.tab) {
   S.tab = tab;
+  S.sel = null;
   if (tab === 'rank') loadRanking().then(() => S.tab === 'rank' && render());
+  if (tab === 'details') loadPublicVotes().then(() => S.tab === 'details' && render());
   render();
 }
 
@@ -431,10 +469,10 @@ view.addEventListener('click', async (e) => {
     render();
   } else if (act === 'submit') submit();
   else if (act === 'reload') {
-    await Promise.all([loadRanking(), loadAdmin()]);
+    await Promise.all([loadRanking(), loadAdmin(), S.tab === 'details' ? loadPublicVotes() : null]);
     render();
   } else if (act === 'cell') {
-    S.sel = { token: b.dataset.token!, target: b.dataset.target! };
+    S.sel = { key: b.dataset.key!, target: b.dataset.target! };
     render();
   } else if (act === 'delete') {
     S.confirmDelete = b.dataset.token!;
@@ -447,7 +485,7 @@ view.addEventListener('click', async (e) => {
     S.confirmDelete = null;
     if (error) toast('Suppression impossible.');
     else toast('Vote supprimé');
-    if (S.sel?.token === b.dataset.token) S.sel = null;
+    if (S.sel?.key === b.dataset.token) S.sel = null;
     await Promise.all([loadAdmin(), loadRanking()]);
     render();
   } else if (act === 'logout' && supabase) {

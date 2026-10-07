@@ -13,6 +13,7 @@ Durée : environ 15 minutes. Il faut deux comptes gratuits : **Supabase** (la ba
    - Région : **Europe** (Paris `eu-west-3` ou Francfort `eu-central-1`)
 2. Une fois le projet prêt, ouvre **SQL Editor → New query**, colle **tout** le contenu de
    `volley-notes/supabase/migrations/20261007000000_init.sql`, puis clique **Run**. Le message attendu est « Success. No rows returned ».
+   Fais de même avec `volley-notes/supabase/migrations/20261007120000_public_votes.sql` (onglet public « Détails »).
 3. Ouvre **Authentication → Sign In / Providers** et désactive **Allow new users to sign up**. Comme ça, personne d'autre ne peut se créer de compte admin.
 4. Ouvre **Project Settings → API Keys** et note :
    - la **Project URL** (`https://xxxx.supabase.co`) ;
@@ -44,6 +45,7 @@ Durée : environ 15 minutes. Il faut deux comptes gratuits : **Supabase** (la ba
 
 - **Tes potes** : envoie-leur l'adresse du site. Chacun choisit son nom, note les 5 autres joueurs et envoie. Il peut revenir modifier ses notes depuis le même téléphone et le même navigateur.
 - **Le classement** est public et se met à jour à chaque vote. Il ne montre que des moyennes.
+- **L'onglet « Détails »** est public lui aussi : tout le monde y voit qui a mis quelle note et tous les commentaires. L'écran de vote le signale avant qu'on note.
 - **Les coulisses** s'ouvrent avec l'adresse suivie de `#coulisses` (par exemple `https://notes-volley.vercel.app/#coulisses`). Connecte-toi avec ton compte admin pour voir :
   - qui a voté, et quand ;
   - le tableau votant × joueur noté, avec le détail en touchant une case ;
