@@ -94,6 +94,7 @@ textarea { width: 100%; min-height: 64px; resize: vertical; border: 1px solid va
 .leader .k { font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 700 }
 .leader .v { font-weight: 700 }
 .leader .n { font-family: var(--display); font-weight: 900; color: var(--accent); font-variant-numeric: tabular-nums }
+.leader.worst .n { color: var(--bad) }
 
 /* backstage */
 .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface) }
