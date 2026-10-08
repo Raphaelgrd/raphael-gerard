@@ -11,9 +11,11 @@
   "dependencies": {
     "@fontsource/big-shoulders-display": "^5.3.0",
     "@fontsource/figtree": "^5.3.0",
-    "@supabase/supabase-js": "^2.117.2"
+    "@supabase/supabase-js": "^2.117.2",
+    "three": "^0.186.1"
   },
   "devDependencies": {
+    "@types/three": "^0.186.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.3"
   }

@@ -1,0 +1,48 @@
+/* Plein écran : la scène 3D derrière, un calque tactile par-dessus, et des fiches pour le menu et les résultats.
+   Thème unique et assumé : ciel clair, fiches sombres lisibles sur n'importe quel fond. */
+:root {
+  --sheet: rgb(16 22 38 / .9);
+  --ink: #ffffff;
+  --muted: #b9c4dc;
+  --accent: #ffc83d;   /* jaune des tremplins et de l'arrivée */
+  --accent-ink: #1b1b1b;
+  --display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #9fd6ff; color: var(--ink); font-family: var(--body); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none }
+[hidden] { display: none !important }
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block }
+#touch { position: fixed; inset: 0; touch-action: none }
+
+#pad { position: fixed; width: 140px; height: 140px; margin: -70px 0 0 -70px; border-radius: 50%; border: 2px solid rgb(255 255 255 / .55); background: rgb(255 255 255 / .12); pointer-events: none }
+#knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; border-radius: 50%; background: rgb(255 255 255 / .85); box-shadow: 0 2px 8px rgb(0 0 0 / .25) }
+
+.hud { position: fixed; left: 0; right: 0; top: 0; padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 0; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none }
+.back { pointer-events: auto; color: #fff; text-decoration: none; font-weight: 700; font-size: .9rem; background: rgb(16 22 38 / .55); padding: 6px 12px; border-radius: 999px }
+.hud-right { text-align: right; text-shadow: 0 2px 6px rgb(0 0 0 / .35) }
+#rank { font: 900 2.6rem/1 var(--display) }
+#rank small { font-size: 1.1rem; opacity: .8 }
+#time { font-weight: 700; font-variant-numeric: tabular-nums; font-size: .95rem }
+#big { position: fixed; inset: 0; display: grid; place-items: center; font: 900 clamp(5rem, 30vw, 10rem) var(--display); color: #fff; text-shadow: 0 6px 24px rgb(0 0 0 / .35); pointer-events: none }
+#fell { position: fixed; left: 50%; top: 30%; transform: translateX(-50%); background: rgb(220 50 50 / .9); color: #fff; padding: 10px 16px; border-radius: 12px; font-weight: 700; pointer-events: none; text-align: center; max-width: calc(100% - 32px) }
+
+#overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; pointer-events: none }
+.sheet { pointer-events: auto; width: min(100%, 420px); max-height: calc(100% - 32px); overflow-y: auto; background: var(--sheet); border-radius: 20px; padding: 22px 20px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 20px 50px rgb(0 0 0 / .3); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px) }
+.sheet h1 { font: 900 2.6rem/1 var(--display); text-transform: uppercase; margin: 0 }
+.sheet p { margin: 0; color: var(--muted) }
+.eyebrow { font-size: .75rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; color: var(--accent) }
+.howto { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 6px; color: var(--muted) }
+.howto b { color: #fff }
+.btn { border: 0; border-radius: 14px; padding: 15px; font: 800 1.05rem var(--body); background: var(--accent); color: var(--accent-ink); cursor: pointer }
+.link { align-self: center; background: none; border: 0; color: var(--muted); font: 600 .9rem var(--body); text-decoration: underline; cursor: pointer; padding: 4px }
+.btn:focus-visible, .link:focus-visible, .pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px }
+.pick { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; border: 1px solid rgb(255 255 255 / .15); background: rgb(255 255 255 / .06); color: #fff; font: 700 1rem var(--body); cursor: pointer }
+.dot { width: 18px; height: 18px; border-radius: 50%; background: var(--c); flex: none }
+.podium { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px }
+.podium li { display: grid; grid-template-columns: 1.4rem 18px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgb(255 255 255 / .06) }
+.podium li.me { background: rgb(255 200 61 / .22) }
+.podium .pos { font: 900 1.3rem var(--display); text-align: center }
+.podium .nm { font-weight: 700 }
+.podium .tm { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums }

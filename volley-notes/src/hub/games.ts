@@ -22,5 +22,12 @@ export const GAMES: { href: string; name: string; tagline: string; color: string
     color: '#c1121f',
     mark: '?',
   },
+  {
+    href: '/toboggan/',
+    name: 'Toboggan',
+    tagline: 'Course de boules en 3D : descends le plus vite et pousse les autres dans le vide.',
+    color: '#1f8fe0',
+    mark: '3D',
+  },
 ];
 

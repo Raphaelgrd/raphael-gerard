@@ -5,6 +5,7 @@ La Mobut App regroupe les jeux de la bande sur une seule adresse :
 - `/volley/` : Notes Volley ;
 - `/qui-de-nous/` : Qui de nous ?
 - `/imposteur/` : L'Imposteur (en ligne)
+- `/toboggan/` : Toboggan, course de boules en 3D (solo contre l'ordinateur pour l'instant ; tracé dans `src/toboggan/track.ts`, réglages de la physique dans `src/toboggan/sim.ts`)
 
 À la première ouverture, la Mobut App demande « Qui es-tu ? » et retient la réponse sur ce téléphone. Tous les jeux s'en servent (lien « Ce n'est pas moi » sur l'accueil pour changer). Les 6 joueurs sont définis une seule fois dans `src/shared/players.ts`.
 
