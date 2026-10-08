@@ -9,7 +9,7 @@ Durée : environ 20 minutes. Deux comptes gratuits sont nécessaires : **Supabas
 ## Raccourci : l'intégration Supabase de Vercel
 
 Sur l'écran de déploiement Vercel, le bloc **Supabase → Add** crée la base et renseigne les variables tout seul (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, que l'app reconnaît). Choisissez une région **Europe**.
-Dans ce cas, sautez la création du projet et la récupération des clés. Ouvrez ensuite la base depuis Vercel (**Storage → Supabase → Open in Supabase**) et faites quand même les étapes **1.2 et 1.3** (script SQL, inscriptions fermées), puis les étapes 3 à 6.
+Dans ce cas, sautez la création du projet et la récupération des clés. Ouvrez ensuite la base depuis Vercel (**Storage → Supabase → Open in Supabase**) et faites quand même les étapes **1.2 et 1.3** (scripts SQL, création de compte), puis les étapes 3 à 6.
 
 ## 1. Créer la base de données (Supabase)
 
@@ -19,9 +19,17 @@ Dans ce cas, sautez la création du projet et la récupération des clés. Ouvre
    - Notez le mot de passe de la base dans un gestionnaire de mots de passe.
 2. Une fois le projet prêt : menu **SQL Editor** → **New query**. Collez **tout** le contenu du fichier
    `netforce-sign/supabase/migrations/20261005000000_init.sql`, puis cliquez **Run**. Le message attendu est « Success. No rows returned ».
+   Recommencez avec `netforce-sign/supabase/migrations/20261008000000_self_signup.sql` (création de compte réservée aux adresses de l'entreprise).
 3. Menu **Authentication → Sign In / Providers** :
-   - désactivez **Allow new users to sign up**. Personne ne peut créer de compte seul, c'est vous qui invitez ;
-   - laissez **Email** activé.
+   - activez **Allow new users to sign up** : chacun crée son compte depuis l'app ;
+   - laissez **Email** activé, avec **Confirm email** activé : l'adresse est vérifiée par un lien envoyé par e-mail.
+
+   Seules les adresses de la liste `signup_allowlist` peuvent créer un compte (au départ : `nexstun.com`). Pour en ajouter, dans **SQL Editor** :
+   ```sql
+   insert into public.signup_allowlist (entry) values ('netforce-defense.com');   -- tout un domaine
+   insert into public.signup_allowlist (entry) values ('prenom.nom@gmail.com');   -- une seule adresse
+   ```
+   La règle vaut aussi pour les invitations et les comptes créés depuis le tableau de bord.
 4. Menu **Project Settings → API Keys** : notez
    - la **Project URL** (`https://xxxx.supabase.co`) ;
    - la clé publique : **anon / publishable**. Ne copiez jamais la clé *service_role / secret* dans l'app.
@@ -54,14 +62,16 @@ Sans ce réglage, les liens d'invitation et de mot de passe oublié ne mènent p
    ```sql
    update public.profiles set role = 'admin' where email = 'vous@netforce-defense.com';
    ```
-3. Connectez-vous sur le site, puis importez le **tampon de l'entreprise** (carte « Mon cachet » → Importer). Il devient disponible pour toute l'équipe ; seuls les administrateurs peuvent le changer.
+3. Connectez-vous sur le site, puis importez votre signature et votre cachet (cartes « Signature » et « Cachet » → Ajouter).
 
-## 5. Inviter l'équipe
+## 5. L'équipe
 
-Supabase → **Authentication → Users → Add user → Send invitation** avec l'e-mail du collègue.
-Il reçoit un e-mail, clique sur le lien, choisit son nom et son mot de passe, puis il est connecté.
+Chaque collègue ouvre le site → **Créer un compte** → nom, e-mail professionnel, mot de passe. Il reçoit un e-mail, clique sur le lien : son compte est actif.
+Il ajoute ensuite **sa propre signature et son propre cachet**, que lui seul voit et utilise. Un cachet commun importé auparavant par un administrateur reste proposé à ceux qui n'ont pas encore le leur.
 
-- Autre méthode : **Create new user** avec un mot de passe provisoire (Auto Confirm), à lui transmettre.
+La session reste ouverte sur chaque appareil : pas besoin de se reconnecter, sauf après « Se déconnecter ». Dans Supabase, **Authentication → Sessions**, laissez **Time-box user sessions** et **Inactivity timeout** désactivés (réglages par défaut).
+
+- Inviter quelqu'un reste possible : **Authentication → Users → Add user → Send invitation**.
 - Pour donner les droits d'administrateur à quelqu'un : même requête SQL qu'à l'étape 4.
 - Pour retirer un accès : supprimez l'utilisateur dans **Authentication → Users**. Les lignes d'historique sont conservées et apparaissent alors comme « Utilisateur supprimé ».
 
@@ -75,7 +85,7 @@ Il reçoit un e-mail, clique sur le lien, choisit son nom et son mot de passe, p
 
 **PC (Chrome / Edge)** : icône d'installation à droite de la barre d'adresse.
 
-Sur iPhone, l'app de l'écran d'accueil ne partage pas la session de Safari. Après avoir choisi son mot de passe via le lien d'invitation (qui s'ouvre dans Safari), il faut **se connecter une fois dans l'app installée**.
+Sur iPhone, l'app de l'écran d'accueil ne partage pas la session de Safari. Après avoir cliqué sur le lien de confirmation ou d'invitation (qui s'ouvre dans Safari), il faut **se connecter une fois dans l'app installée**.
 
 ---
 
@@ -85,7 +95,7 @@ Sur iPhone, l'app de l'écran d'accueil ne partage pas la session de Safari. Apr
 |---|---|---|
 | Documents PDF / Word | **Jamais** : ils restent sur l'appareil | — |
 | Signature | Oui (image) | Son propriétaire uniquement |
-| Tampon de l'entreprise | Oui (image) | Toute l'équipe (modifiable par les admins) |
+| Cachet | Oui (image) | Son propriétaire uniquement |
 | Historique : nom du fichier, date, format, nombre de signatures, empreinte SHA-256 | Oui, non modifiable et non effaçable depuis l'app | Chacun voit le sien ; les admins voient tout |
 
 L'empreinte SHA-256 permet de prouver plus tard qu'un fichier donné est bien celui qui a été signé, sans conserver le fichier.
