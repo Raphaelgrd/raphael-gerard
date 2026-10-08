@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import App from './App';
 import Brand from './components/Brand';
 import Login from './components/Login';
-import { authLinkError, authLinkType, cloudEnabled, fetchProfile, frError, signOut, supabase, type Profile } from './lib/cloud';
+import { authLinkError, authLinkType, cloudEnabled, fetchProfile, frError, keepSignedIn, signOut, supabase, type Profile } from './lib/cloud';
 
 export default function Root() {
   return cloudEnabled ? <CloudRoot /> : <App cloud={null} />;
@@ -34,6 +34,7 @@ function CloudRoot() {
       setProfile(null);
       return;
     }
+    keepSignedIn();
     let alive = true;
     fetchProfile(userId)
       .then((p) => {
@@ -69,7 +70,7 @@ function CloudRoot() {
     return (
       <div className="app">
         {header}
-        <Login key="sign-in" mode="sign-in" initialError={error} />
+        <Login key="sign-in" mode="sign-in" initialError={error} confirmed={authLinkType === 'signup'} />
       </div>
     );
   }

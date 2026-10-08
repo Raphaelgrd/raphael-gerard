@@ -690,13 +690,6 @@ button:disabled {
   margin-left: auto;
 }
 
-.asset-note {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 400;
-}
-
 .asset-preview {
   height: 76px;
   display: grid;

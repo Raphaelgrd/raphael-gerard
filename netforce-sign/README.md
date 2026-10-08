@@ -30,9 +30,8 @@ Les documents sont traités **dans le navigateur** : ils ne sont jamais envoyés
   | Word | Rendu fidèle des pages (images) | `.docx` d'origine **modifiable**, signatures insérées en images ancrées |
 
 - **Comptes d'équipe** (Supabase, facultatif) :
-  - connexion par e-mail et mot de passe, comptes créés ou invités par un administrateur ;
-  - chacun retrouve sa signature sur tous ses appareils ;
-  - le tampon est commun à l'entreprise et seuls les administrateurs peuvent le changer ;
+  - chacun crée son compte (adresse de l'entreprise, vérifiée par e-mail) et reste connecté ;
+  - chacun a sa signature et son cachet, retrouvés sur tous ses appareils ;
   - l'historique garde qui a signé quoi et quand, avec l'empreinte SHA-256 du fichier. Les admins voient tout le monde.
   - Sans configuration Supabase, l'app fonctionne seule, en local.
 - **PWA installable** (« Ajouter à l'écran d'accueil » sur iOS/Android, « Installer » sur Chrome/Edge) et utilisable hors ligne.

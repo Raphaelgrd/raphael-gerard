@@ -13,7 +13,7 @@ export const cloudEnabled = !!(url && key);
 
 // Lien d'invitation ou de réinitialisation : on note le type avant que supabase-js ne nettoie l'URL.
 const hashParams = new URLSearchParams(window.location.hash.slice(1));
-export const authLinkType = hashParams.get('type') as 'invite' | 'recovery' | null;
+export const authLinkType = hashParams.get('type') as 'invite' | 'recovery' | 'signup' | null;
 export const authLinkError = hashParams.get('error_description');
 
 export const supabase: SupabaseClient | null = cloudEnabled
@@ -49,6 +49,10 @@ const db = () => {
 /** Traduit les erreurs Supabase les plus courantes. */
 export function frError(e: unknown): string {
   const msg = (e as { message?: string })?.message ?? String(e);
+  if (/database error saving new user/i.test(msg))
+    return 'Adresse non autorisée : utilisez votre adresse e-mail professionnelle.';
+  if (/signups? not allowed|signup.*disabled/i.test(msg)) return 'La création de compte est désactivée. Contactez un administrateur.';
+  if (/already registered|already been registered|user already exists/i.test(msg)) return 'Un compte existe déjà avec cette adresse : connectez-vous.';
   if (/invalid login credentials/i.test(msg)) return 'E-mail ou mot de passe incorrect.';
   if (/email not confirmed/i.test(msg)) return "Adresse e-mail non confirmée. Vérifiez votre boîte de réception.";
   if (/password should be at least|weak password/i.test(msg)) return 'Mot de passe trop court : 8 caractères minimum.';
@@ -71,6 +75,25 @@ export async function getSession(): Promise<Session | null> {
 export async function signIn(email: string, password: string) {
   const { error } = await db().auth.signInWithPassword({ email: email.trim(), password });
   if (error) throw error;
+}
+
+/** Crée un compte. Renvoie `true` si un e-mail de confirmation a été envoyé (sinon la session est ouverte). */
+export async function signUp(email: string, password: string, fullName: string): Promise<boolean> {
+  const { data, error } = await db().auth.signUp({
+    email: email.trim(),
+    password,
+    // Le lien de confirmation ouvre l'app principale, même si l'inscription vient du volet Outlook.
+    options: { data: { full_name: fullName.trim() }, emailRedirectTo: window.location.origin + '/' },
+  });
+  if (error) throw error;
+  // Adresse déjà inscrite : Supabase renvoie un compte sans identité, sans erreur.
+  if (data.user && !data.user.identities?.length) throw new Error('User already registered');
+  return !data.session;
+}
+
+/** Demande au navigateur de ne jamais effacer la session enregistrée sur l'appareil. */
+export function keepSignedIn() {
+  navigator.storage?.persist?.().catch(() => undefined);
 }
 
 export async function signOut() {
@@ -103,7 +126,7 @@ export async function updateFullName(userId: string, fullName: string) {
   if (error) throw error;
 }
 
-/** Signature personnelle + cachet de l'entreprise. */
+/** Signature et cachet personnels (l'ancien cachet commun sert de secours à qui n'a pas encore le sien). */
 export async function fetchAssets(userId: string): Promise<Record<Kind, Asset | null>> {
   const { data, error } = await db()
     .from('assets')
@@ -112,20 +135,15 @@ export async function fetchAssets(userId: string): Promise<Record<Kind, Asset | 
   if (error) throw error;
   const pick = (kind: Kind) => {
     const rows = (data ?? []).filter((r) => r.kind === kind);
-    // La version personnelle prime sur celle de l'entreprise (cas d'une signature), l'inverse pour le cachet.
-    const row =
-      kind === 'stamp'
-        ? rows.find((r) => r.scope === 'company') ?? rows.find((r) => r.scope === 'user')
-        : rows.find((r) => r.scope === 'user');
+    const row = rows.find((r) => r.scope === 'user') ?? (kind === 'stamp' ? rows.find((r) => r.scope === 'company') : undefined);
     return row ? { src: row.data_url as string, ratio: row.ratio as number } : null;
   };
   return { signature: pick('signature'), stamp: pick('stamp') };
 }
 
 export async function saveCloudAsset(kind: Kind, asset: Asset) {
-  const scope = kind === 'stamp' ? 'company' : 'user';
   const { error } = await db().rpc('save_asset', {
-    p_scope: scope,
+    p_scope: 'user',
     p_kind: kind,
     p_data_url: asset.src,
     p_ratio: asset.ratio,

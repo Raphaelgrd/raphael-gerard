@@ -25,6 +25,9 @@ const check = (name, cond, extra = '') => {
   if (!cond) fails++;
 };
 
+// Domaine des comptes de test autorisé (la table n'est accessible qu'en service).
+await service.from('signup_allowlist').upsert({ entry: 'netforce.test' });
+
 for (const [email, full_name] of [
   ['admin@netforce.test', 'Admin Test'],
   ['agent@netforce.test', 'Agent Test'],
@@ -47,7 +50,24 @@ const png = 'data:image/png;base64,iVBORw0KGgo=';
 
 // Comptes
 const su = await anon.auth.signUp({ email: 'intrus@exemple.com', password: PASSWORD });
-check('inscription publique refusée', !!su.error, 'inscription acceptée');
+check('inscription hors entreprise refusée', !!su.error, 'inscription acceptée');
+const inv = await service.auth.admin.createUser({ email: 'pirate@exemple.com', password: PASSWORD, email_confirm: true });
+check('aucun compte hors liste, même créé en service', !!inv.error);
+const ok = await anon.auth.signUp({
+  email: `nouveau${Date.now()}@NETFORCE.test`,
+  password: PASSWORD,
+  options: { data: { full_name: 'Nouveau Membre' } },
+});
+check(
+  "inscription libre avec l'adresse de l'entreprise, confirmation par e-mail",
+  !ok.error && !!ok.data.user?.identities?.length && !ok.data.session,
+  ok.error?.message,
+);
+const np = await service.from('profiles').select('full_name, role').eq('id', ok.data.user?.id).single();
+check('le nouveau compte est un membre, avec son nom', np.data?.full_name === 'Nouveau Membre' && np.data?.role === 'member');
+const list = await anon.from('signup_allowlist').select('*');
+const list2 = await (await login('agent@netforce.test')).c.from('signup_allowlist').select('*');
+check('la liste des adresses autorisées est privée', !list.data?.length && !list2.data?.length);
 
 const p = await M.c.from('profiles').select('full_name, role').eq('id', M.id).single();
 check('profil créé automatiquement avec le nom', ['Agent Test', 'Agent Renommé'].includes(p.data?.full_name) && p.data?.role === 'member');
@@ -69,17 +89,21 @@ check("l'admin remplace le cachet sans doublon", !as2.error && as2.data?.ratio =
 const mupd = await M.c.from('assets').update({ ratio: 9 }).eq('scope', 'company').select();
 check('un membre ne peut pas modifier le cachet en direct', !mupd.data?.length);
 
-// Signatures personnelles
+// Signatures et cachets personnels
 for (const u of [A, M]) {
   const r = await u.c.rpc('save_asset', { p_scope: 'user', p_kind: 'signature', p_data_url: png, p_ratio: 3 });
   check('chacun enregistre sa signature', !r.error, r.error?.message);
 }
+const mst = await M.c.rpc('save_asset', { p_scope: 'user', p_kind: 'stamp', p_data_url: png, p_ratio: 2 });
+check('un membre enregistre son propre cachet', !mst.error, mst.error?.message);
+const ast = await A.c.from('assets').select('owner').eq('scope', 'user').eq('kind', 'stamp');
+check("le cachet d'un membre reste privé", !ast.data?.some((r) => r.owner === M.id));
 const r2 = await M.c.rpc('save_asset', { p_scope: 'user', p_kind: 'signature', p_data_url: png, p_ratio: 4 });
 check('la signature est remplacée', !r2.error && r2.data?.ratio === 4, r2.error?.message);
 const seen = await M.c.from('assets').select('scope, owner, kind');
 check(
-  'un membre voit le cachet et sa signature, rien d’autre',
-  seen.data?.length === 2 && seen.data.every((r) => r.scope === 'company' || r.owner === M.id),
+  'un membre voit le cachet commun et les siens, rien d’autre',
+  seen.data?.length === 3 && seen.data.every((r) => r.scope === 'company' || r.owner === M.id),
   JSON.stringify(seen.data),
 );
 const forged = await M.c.from('assets').insert({ scope: 'user', owner: A.id, kind: 'signature', data_url: png, ratio: 1 });

@@ -46,13 +46,8 @@ interface SignedAttachment {
   placements: Placement[];
 }
 
-const NO_STAMP = 'Cachet non défini (admin)';
-
 export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { cloud: CloudContext | null; inOutlook?: boolean }) {
   const ns = cloud?.profile.id;
-  const isAdmin = !cloud || cloud.profile.role === 'admin';
-  /** Le cachet est commun à l'entreprise : seuls les administrateurs le modifient. */
-  const canEdit = (kind: Kind) => kind === 'signature' || isAdmin;
   const [doc, setDoc] = useState<LoadedDoc | null>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [sections, setSections] = useState<HTMLElement[]>([]);
@@ -238,23 +233,14 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
     setSelectedId(p.id);
   };
 
-  const requestAsset = (kind: Kind, pending: Pending) => {
-    if (canEdit(kind)) setModal({ kind, pending });
-    else setToast(NO_STAMP);
-  };
+  const requestAsset = (kind: Kind, pending: Pending) => setModal({ kind, pending });
 
   const fillAll = (current = assets) => {
-    let todo = zones.filter((z) => !filledZoneIds.has(z.id));
-    const missing = (['signature', 'stamp'] as Kind[]).find(
-      (k) => !current[k] && canEdit(k) && todo.some((z) => z.kind === k),
-    );
+    const todo = zones.filter((z) => !filledZoneIds.has(z.id));
+    const missing = (['signature', 'stamp'] as Kind[]).find((k) => !current[k] && todo.some((z) => z.kind === k));
     if (missing) {
       setModal({ kind: missing, pending: { type: 'all' } });
       return;
-    }
-    if (todo.some((z) => !current[z.kind])) {
-      setToast(NO_STAMP);
-      todo = todo.filter((z) => current[z.kind]);
     }
     if (!todo.length) return;
     snapshot();
@@ -663,13 +649,9 @@ export default function App({ cloud, inOutlook = outlook.inOutlookPane }: { clou
         <div className="asset-head">
           {isSig ? <IconPen /> : <IconStamp />}
           <span>{isSig ? 'Signature' : 'Cachet'}</span>
-          {canEdit(kind) ? (
-            <button className="link" onClick={() => setModal({ kind, pending: null })}>
-              {a ? 'Modifier' : 'Ajouter'}
-            </button>
-          ) : (
-            <span className="asset-note">Équipe</span>
-          )}
+          <button className="link" onClick={() => setModal({ kind, pending: null })}>
+            {a ? 'Modifier' : 'Ajouter'}
+          </button>
         </div>
         <button className="asset-preview checker" onClick={() => (a ? arm(kind) : requestAsset(kind, null))}>
           {a ? <img src={a.src} alt="" /> : <IconPlus width={20} height={20} />}
