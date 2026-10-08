@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#7a1f4b" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <title>Notes Volley</title>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <a class="back" href="/">← Mobut App</a>
+        <span class="eyebrow">Let your friend rate you</span>
+        <h1>Notes Volley</h1>
+        <p class="muted">Note chaque joueur de 0 à 10 sur les six gestes. Le classement fait la moyenne de tous les votes.</p>
+      </header>
+
+      <nav class="tabs" role="tablist" id="tabs">
+        <button role="tab" id="tab-vote" aria-selected="true" data-tab="vote">Noter</button>
+        <button role="tab" id="tab-rank" aria-selected="false" data-tab="rank">Classement</button>
+        <button role="tab" id="tab-details" aria-selected="false" data-tab="details">Détails</button>
+        <button role="tab" id="tab-self" aria-selected="false" data-tab="self">Auto-notes</button>
+        <button role="tab" id="tab-comments" aria-selected="false" data-tab="comments">Commentaires</button>
+        <button role="tab" id="tab-admin" aria-selected="false" data-tab="admin" hidden>Coulisses</button>
+      </nav>
+
+      <main id="view"></main>
+    </div>
+    <div class="toast" id="toast" hidden></div>
+    <script type="module" src="/src/volley/main.ts"></script>
+  </body>
+</html>

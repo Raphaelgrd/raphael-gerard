@@ -1,4 +1,24 @@
-# Mise en ligne de Notes Volley
+# Mise en ligne de la Mobut App
+
+La Mobut App regroupe les jeux de la bande sur une seule adresse :
+- `/` : le menu des jeux ;
+- `/volley/` : Notes Volley ;
+- `/qui-de-nous/` : Qui de nous ?
+
+Tous les jeux partagent le même projet Vercel (Root Directory `volley-notes`) et le même projet Supabase.
+
+## Ajouter un jeu
+
+1. Crée `<jeu>/index.html` (copie celui d'un jeu existant) et son code dans `src/<jeu>/`.
+2. Ajoute une ligne dans `vite.config.ts` (`input`) et une dans `src/hub/games.ts` (la tuile du menu).
+3. Si le jeu enregistre des données, ajoute son script dans `supabase/migrations/` et lance-le dans Supabase.
+
+## Qui de nous ?
+
+Les questions et les initiales des joueurs sont dans `src/qui-de-nous/questions.ts`. Pour corriger une question, change son texte et garde son `id` ; pour une nouvelle question, mets un nouvel `id`.
+
+---
+
 
 Durée : environ 15 minutes. Il faut deux comptes gratuits : **Supabase** (la base de données) et **Vercel** (l'hébergement du site).
 
@@ -15,6 +35,7 @@ Durée : environ 15 minutes. Il faut deux comptes gratuits : **Supabase** (la ba
    `volley-notes/supabase/migrations/20261007000000_init.sql`, puis clique **Run**. Le message attendu est « Success. No rows returned ».
    Fais de même avec `volley-notes/supabase/migrations/20261007120000_public_votes.sql` (onglet public « Détails »)
    puis `volley-notes/supabase/migrations/20261007140000_self_votes.sql` (onglet « Auto-notes »), dans cet ordre.
+   Pour Qui de nous ? : `volley-notes/supabase/migrations/20261008000000_qui_de_nous.sql`.
 3. Ouvre **Authentication → Sign In / Providers** et désactive **Allow new users to sign up**. Comme ça, personne d'autre ne peut se créer de compte admin.
 4. Ouvre **Project Settings → API Keys** et note :
    - la **Project URL** (`https://xxxx.supabase.co`) ;
@@ -49,7 +70,7 @@ Durée : environ 15 minutes. Il faut deux comptes gratuits : **Supabase** (la ba
 - **L'onglet « Détails »** est public lui aussi : tout le monde y voit qui a mis quelle note et tous les commentaires. L'écran de vote le signale avant qu'on note.
 - **La rubrique « Commentaires »** : une fiche repliable par joueur, avec les commentaires reçus rangés par geste (et ses commentaires sur lui-même à la fin). Des boutons permettent de n'afficher qu'un geste.
 - **L'onglet « Auto-notes »** : chacun peut se noter lui-même, à part. Ces notes ont leur propre classement, comparé à la moyenne donnée par les autres, et ne comptent jamais dans le classement général. Pour supprimer une auto-note, ouvre la table `self_votes` dans Supabase (**Table Editor**).
-- **Les coulisses** s'ouvrent avec l'adresse suivie de `#coulisses` (par exemple `https://notes-volley.vercel.app/#coulisses`). Connecte-toi avec ton compte admin pour voir :
+- **Les coulisses** s'ouvrent avec l'adresse suivie de `/volley/#coulisses` (par exemple `https://notes-volley.vercel.app/volley/#coulisses`). Connecte-toi avec ton compte admin pour voir :
   - qui a voté, et quand ;
   - le tableau votant × joueur noté, avec le détail en touchant une case ;
   - tous les commentaires ;

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#4b2fd1" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="/qui-de-nous.svg" type="image/svg+xml" />
+    <title>Qui de nous ?</title>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <a class="back" href="/">← Mobut App</a>
+        <span class="eyebrow">Le jeu du groupe</span>
+        <h1>Qui de nous ?</h1>
+      </header>
+
+      <nav class="tabs" role="tablist" id="tabs">
+        <button role="tab" id="tab-play" aria-selected="true" data-tab="play">Jouer</button>
+        <button role="tab" id="tab-results" aria-selected="false" data-tab="results">Résultats</button>
+      </nav>
+
+      <main id="view"></main>
+    </div>
+    <div class="toast" id="toast" hidden></div>
+    <script type="module" src="/src/qui-de-nous/main.ts"></script>
+  </body>
+</html>
