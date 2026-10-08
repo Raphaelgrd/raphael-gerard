@@ -15,6 +15,12 @@ export const GAMES: { href: string; name: string; tagline: string; color: string
     color: '#4b2fd1',
     mark: '1–6',
   },
+  {
+    href: '/imposteur/',
+    name: "L'Imposteur",
+    tagline: 'Tout le monde a le même mot, sauf un. Indices, vote, et démasque l’imposteur en ligne.',
+    color: '#c1121f',
+    mark: '?',
+  },
 ];
 
-export const MEMBERS = ['Matias', 'Raph.S', 'Raph.G', 'Sofiane', 'Mathieu', 'Paco'];

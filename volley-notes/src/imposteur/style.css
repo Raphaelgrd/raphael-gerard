@@ -1,0 +1,115 @@
+/* Layout: one phone column. Deliberately single-theme: a dark "interrogation room" with one red signal colour.
+   The secret card is the only light surface, like a slip of paper handed under the table. */
+:root {
+  --bg: #14090b;
+  --surface: #20131a;
+  --surface-2: #2b1a22;
+  --ink: #f4e9ec;
+  --muted: #b39ca5;
+  --line: #3b2630;
+  --accent: #ff4d5a;      /* alarm red */
+  --accent-ink: #14090b;
+  --paper: #f3ead8;       /* the secret slip */
+  --paper-ink: #2a1b12;
+  --good: #5fd39a;
+  --display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box }
+html { -webkit-text-size-adjust: 100%; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); background: var(--bg) }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.45 }
+[hidden] { display: none !important }
+.wrap { max-width: 560px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 48px; display: flex; flex-direction: column; gap: 18px }
+header { display: flex; flex-direction: column; gap: 4px }
+h1, h2 { font-family: var(--display); font-weight: 900; text-transform: uppercase; margin: 0; line-height: 1; text-wrap: balance }
+h1 { font-size: 3rem; letter-spacing: .01em }
+h2 { font-size: 1.6rem }
+p { margin: 0 }
+.muted { color: var(--muted) }
+.small { font-size: .85rem }
+.eyebrow { font-size: .75rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; color: var(--accent) }
+.back { align-self: flex-start; font-size: .85rem; font-weight: 600; color: var(--muted); text-decoration: none; padding: 4px 0 }
+.back:hover { color: var(--accent) }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+
+.stack { display: flex; flex-direction: column; gap: 14px }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap }
+.row.between { justify-content: space-between }
+.row input { flex: 1; min-width: 0 }
+
+.btn { border: 0; border-radius: 12px; padding: 13px 16px; font: 700 1rem var(--body); cursor: pointer; background: var(--accent); color: var(--accent-ink) }
+.btn:disabled { opacity: .4; cursor: not-allowed }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line) }
+.btn.danger { background: transparent; color: var(--accent); border: 1px solid var(--accent) }
+.link { align-self: center; background: none; border: 0; color: var(--muted); font: 600 .85rem var(--body); text-decoration: underline; cursor: pointer; padding: 6px }
+input { border: 1px solid var(--line); border-radius: 10px; padding: 12px; font: 1rem var(--body); background: var(--bg); color: var(--ink) }
+
+/* faces */
+.face { display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--c); color: #fff; font: 900 1.05rem var(--display); flex: none; box-shadow: inset 0 -4px 0 rgb(0 0 0 / .25) }
+.face.sm { width: 28px; height: 28px; font-size: .78rem }
+.face.xl { width: 64px; height: 64px; font-size: 1.5rem }
+
+.picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px }
+.pick { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font: 700 1rem var(--body); cursor: pointer; text-align: left }
+
+/* lobby */
+.seats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px }
+.seat { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); cursor: pointer; min-width: 0 }
+.seat.sel { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent) }
+.seat.away { opacity: .35; cursor: default }
+.seat .sname { font-weight: 700; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100% }
+.seat .sstate { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted) }
+.seat.sel .sstate { color: var(--accent) }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden }
+.seg button { border: 0; background: transparent; color: var(--ink); font: 700 .95rem var(--body); padding: 8px 16px; cursor: pointer }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink) }
+.scores { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px }
+.scores li { display: flex; align-items: center; gap: 10px }
+.scores .pos { width: 1.2rem; text-align: center; font: 900 1.1rem var(--display); color: var(--muted) }
+.scores .sname { flex: 1; font-weight: 600 }
+.scores b { font: 900 1.3rem var(--display); font-variant-numeric: tabular-nums }
+.rules summary { cursor: pointer; font-weight: 700 }
+.rules ol { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: .92rem }
+
+/* the secret card */
+.card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 26px 16px; border-radius: 18px; border: 2px dashed var(--line); background: var(--surface); color: var(--ink); cursor: pointer; text-align: center; font-family: var(--body) }
+.card.open { background: var(--paper); color: var(--paper-ink); border: 0; box-shadow: 0 10px 30px rgb(0 0 0 / .4); transform: rotate(-1deg) }
+.card.open.imp { background: var(--accent); color: var(--accent-ink) }
+.card-label { font-size: .75rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; opacity: .7 }
+.card-word { font: 900 clamp(2.2rem, 11vw, 3.2rem)/1 var(--display); text-transform: uppercase; overflow-wrap: anywhere }
+.card-sub { font-size: .88rem; opacity: .8 }
+
+/* game */
+.order { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap }
+.order li { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 999px; background: var(--surface-2); font-size: .85rem; font-weight: 600 }
+.order li.now { background: var(--accent); color: var(--accent-ink) }
+.clues { display: flex; flex-direction: column; gap: 10px }
+.cround { display: flex; flex-direction: column; gap: 6px }
+.cround ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px }
+.cround li { display: grid; grid-template-columns: 28px minmax(0, 5.5rem) minmax(0, 1fr); align-items: center; gap: 8px }
+.cround .sname { font-size: .85rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.clue { font: 900 1.25rem var(--display); text-transform: uppercase; overflow-wrap: anywhere }
+.send { display: flex; flex-direction: column; gap: 6px }
+.waiting { font-size: 1.05rem }
+.suspects { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px }
+.suspect { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font: 700 .9rem var(--body); cursor: pointer }
+.suspect.sel { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent) }
+
+/* reveal */
+.reveal { border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--line); background: var(--surface) }
+.reveal.imp { border-color: var(--accent) }
+.reveal.civils { border-color: var(--good) }
+.reveal.civils .eyebrow { color: var(--good) }
+.reveal-main { display: flex; align-items: center; gap: 14px }
+.reveal-main strong { display: block; font: 900 2rem/1 var(--display); text-transform: uppercase }
+.word-line b { font: 900 1.3rem var(--display); text-transform: uppercase }
+.tally { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px }
+.tally li { display: flex; align-items: center; gap: 8px; font-size: .88rem; min-width: 0 }
+.tally li span:not(.face) { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.tally b { color: var(--muted); font-weight: 600 }
+
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 600; font-size: .92rem; max-width: calc(100% - 32px); z-index: 10 }
+@media (prefers-reduced-motion: reduce) { .card.open { transform: none } }

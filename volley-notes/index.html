@@ -13,9 +13,16 @@
       <header>
         <span class="eyebrow">Les jeux de la bande</span>
         <h1>La Mobut App</h1>
-        <ul class="members" id="members"></ul>
       </header>
-      <section style="display:flex;flex-direction:column;gap:12px">
+
+      <section id="who" class="who" hidden>
+        <h2>Qui es-tu ?</h2>
+        <p class="muted">Choisis ton nom une fois : tous les jeux sauront que c'est toi sur ce téléphone.</p>
+        <div class="who-list" id="who-list"></div>
+      </section>
+
+      <section id="menu" class="menu" hidden>
+        <p class="hello" id="hello"></p>
         <h2>Choisis un jeu</h2>
         <ul class="games" id="games"></ul>
       </section>
