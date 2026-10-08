@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#9fd6ff" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="/toboggan.svg" type="image/svg+xml" />
+    <title>Toboggan</title>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <div id="touch" aria-hidden="true"></div>
+    <div id="pad" hidden><div id="knob"></div></div>
+
+    <div class="hud">
+      <a class="back" href="/">← Mobut</a>
+      <div class="hud-right"><div id="rank"></div><div id="time"></div></div>
+    </div>
+    <div id="big" hidden></div>
+    <div id="fell" hidden>Tombé ! Retour au dernier point de passage…</div>
+
+    <div id="overlay">
+      <section id="menu" class="sheet" hidden></section>
+      <section id="results" class="sheet" hidden></section>
+    </div>
+    <script type="module" src="/src/toboggan/main.ts"></script>
+  </body>
+</html>

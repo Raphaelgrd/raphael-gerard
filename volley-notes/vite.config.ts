@@ -11,6 +11,7 @@ export default defineConfig({
         volley: new URL('./volley/index.html', import.meta.url).pathname,
         'qui-de-nous': new URL('./qui-de-nous/index.html', import.meta.url).pathname,
         imposteur: new URL('./imposteur/index.html', import.meta.url).pathname,
+        toboggan: new URL('./toboggan/index.html', import.meta.url).pathname,
       },
     },
   },
