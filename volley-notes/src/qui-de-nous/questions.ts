@@ -1,6 +1,9 @@
 // Les questions du jeu. Pour en changer : modifie le texte, ajoute ou retire des lignes.
 // L'`id` relie les réponses déjà données à la question : garde-le quand tu corriges juste le texte,
 // mets-en un nouveau (lettres minuscules, chiffres, - ou _) pour une vraie nouvelle question.
+// Mettre à true pour dévoiler les résultats dans l'onglet « Résultats ».
+export const RESULTS_VISIBLE = false;
+
 export const QUESTIONS: { id: string; text: string }[] = [
   { id: 'm1', text: 'Qui de nous peut se faire arnaquer facilement ?' },
   { id: 'm2', text: 'Qui de nous part au Brésil ?' },
