@@ -120,3 +120,9 @@ details summary { cursor: pointer; font-weight: 600; font-size: .9rem; color: va
 @media (prefers-reduced-motion: reduce) { .head, .head .face { transition: none } }
 .back { align-self: flex-start; font-size: .85rem; font-weight: 600; color: var(--muted); text-decoration: none; padding: 4px 0 }
 .back:hover { color: var(--accent) }
+.progress-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px }
+.progress-list li { display: grid; grid-template-columns: 30px minmax(0, 6.5rem) minmax(0, 1fr) auto; align-items: center; gap: 8px }
+.progress-list .pn { font-weight: 600; font-size: .92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.progress-list .meter { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden }
+.progress-list .meter b { display: block; height: 100%; border-radius: 3px }
+.progress-list .avg { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums }

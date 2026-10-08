@@ -4,7 +4,7 @@ import '@fontsource/figtree/600';
 import '@fontsource/figtree/700';
 import './style.css';
 import { supabase } from '../shared/supabase';
-import { PLAYERS, QUESTIONS } from './questions';
+import { PLAYERS, QUESTIONS, RESULTS_VISIBLE } from './questions';
 import { getMe } from '../shared/identity';
 
 
@@ -92,7 +92,7 @@ function renderPlay() {
       <h2>Merci ${esc(pName(S.me!))}</h2>
       <p class="muted">Tes ${QUESTIONS.length} classements sont enregistrés. Tu peux en refaire un quand tu veux.</p>
       <div class="row">
-        <button class="btn" data-act="tab" data-tab="results">Voir les résultats</button>
+        <button class="btn" data-act="tab" data-tab="results">${RESULTS_VISIBLE ? 'Voir les résultats' : 'Voir qui a répondu'}</button>
         <button class="btn ghost" data-act="restart">Refaire mes classements</button>
       </div>
     </section>`;
@@ -147,12 +147,27 @@ function aggregate(answers: Answer[]) {
   }).sort((a, b) => a.avg - b.avg || b.firsts - a.firsts);
 }
 
+/** Résultats masqués : on montre seulement qui a répondu, et à combien de questions. */
+function renderHidden() {
+  const count = (id: string) => new Set(S.all.filter((a) => a.voter === id).map((a) => a.question_id)).size;
+  return `<section class="panel">
+    <span class="eyebrow">Résultats cachés</span>
+    <h2>Patience</h2>
+    <p class="muted">Les résultats seront dévoilés quand tout le monde aura répondu. En attendant, voici qui a joué.</p>
+    <ul class="progress-list">${PLAYERS.map((p) => {
+      const n = Math.min(count(p.id), QUESTIONS.length);
+      return `<li>${face(p.id, 'sm')}<span class="pn">${esc(p.name)}</span><span class="meter"><b style="width:${(n / QUESTIONS.length) * 100}%; background:${p.color}"></b></span><span class="avg">${n} / ${QUESTIONS.length}</span></li>`;
+    }).join('')}</ul>
+  </section>`;
+}
+
 function renderResults() {
   if (S.allState !== 'ready' && !S.all.length) {
     return `<section class="panel"><h2>Résultats</h2><p class="muted">${
       S.allState === 'loading' ? 'Chargement…' : 'Impossible de charger les résultats. Vérifie ta connexion puis réessaie.'
     }</p>${configNotice()}</section>`;
   }
+  if (!RESULTS_VISIBLE) return renderHidden();
   const voters = new Set(S.all.map((a) => a.id)).size;
   return `<section class="results">
     <div><h2>Résultats</h2><p class="muted small">${voters} participant${voters > 1 ? 's' : ''}. Classement par position moyenne : plus elle est basse, plus le groupe le met en tête.</p></div>
