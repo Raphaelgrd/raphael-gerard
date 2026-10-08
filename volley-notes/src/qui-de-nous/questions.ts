@@ -12,13 +12,5 @@ export const QUESTIONS: { id: string; text: string }[] = [
   { id: 'q8', text: 'Qui de nous est le plus fiable en cas de galère ?' },
 ];
 
-// Les 6 joueurs. Les `id` doivent rester identiques à ceux du script SQL.
-// `short` : les lettres affichées sur la tête, différentes pour chacun.
-export const PLAYERS: { id: string; name: string; short: string; color: string }[] = [
-  { id: 'matias', name: 'Matias', short: 'MA', color: '#e2543d' },
-  { id: 'raphs', name: 'Raph.S', short: 'RS', color: '#2f7fd8' },
-  { id: 'raphg', name: 'Raph.G', short: 'RG', color: '#1f9e74' },
-  { id: 'sofiane', name: 'Sofiane', short: 'SO', color: '#c2409a' },
-  { id: 'mathieu', name: 'Mathieu', short: 'MT', color: '#e09a1a' },
-  { id: 'paco', name: 'Paco', short: 'PA', color: '#7a55d6' },
-];
+// Les 6 joueurs sont communs à toute la Mobut App : src/shared/players.ts.
+export { PLAYERS } from '../shared/players';

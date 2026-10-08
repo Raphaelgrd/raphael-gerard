@@ -5,6 +5,7 @@ import '@fontsource/figtree/700';
 import './style.css';
 import { supabase } from '../shared/supabase';
 import type { Session } from '@supabase/supabase-js';
+import { getMe } from '../shared/identity';
 
 const PLAYERS = [
   { id: 'matias', name: 'Matias' },
@@ -73,7 +74,8 @@ const TOKEN = deviceToken();
 const S = {
   tab: 'vote' as 'vote' | 'rank' | 'details' | 'self' | 'comments' | 'admin',
   stage: 'who' as 'who' | 'rate' | 'done',
-  me: null as string | null,
+  // Prérempli avec l'identité de la Mobut App (sauf les deux Raphaël, numérotés autrement ici).
+  me: ({ matias: 'matias', sofiane: 'sofiane', mathieu: 'mathieu', paco: 'paco' } as Record<string, string>)[getMe() ?? ''] ?? null,
   step: 0,
   scores: {} as Scores,
   notes: {} as Notes,

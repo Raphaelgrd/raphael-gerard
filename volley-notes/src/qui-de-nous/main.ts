@@ -5,6 +5,7 @@ import '@fontsource/figtree/700';
 import './style.css';
 import { supabase } from '../shared/supabase';
 import { PLAYERS, QUESTIONS } from './questions';
+import { getMe } from '../shared/identity';
 
 
 interface Answer {
@@ -39,7 +40,7 @@ const TOKEN = deviceToken();
 const S = {
   tab: 'play' as 'play' | 'results',
   stage: 'who' as 'who' | 'play' | 'done',
-  me: null as string | null,
+  me: getMe(),
   q: 0,
   picks: [] as string[],
   mine: {} as Record<string, string[]>,

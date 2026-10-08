@@ -4,6 +4,9 @@ La Mobut App regroupe les jeux de la bande sur une seule adresse :
 - `/` : le menu des jeux ;
 - `/volley/` : Notes Volley ;
 - `/qui-de-nous/` : Qui de nous ?
+- `/imposteur/` : L'Imposteur (en ligne)
+
+À la première ouverture, la Mobut App demande « Qui es-tu ? » et retient la réponse sur ce téléphone. Tous les jeux s'en servent (lien « Ce n'est pas moi » sur l'accueil pour changer). Les 6 joueurs sont définis une seule fois dans `src/shared/players.ts`.
 
 Tous les jeux partagent le même projet Vercel (Root Directory `volley-notes`) et le même projet Supabase.
 
@@ -12,6 +15,17 @@ Tous les jeux partagent le même projet Vercel (Root Directory `volley-notes`) e
 1. Crée `<jeu>/index.html` (copie celui d'un jeu existant) et son code dans `src/<jeu>/`.
 2. Ajoute une ligne dans `vite.config.ts` (`input`) et une dans `src/hub/games.ts` (la tuile du menu).
 3. Si le jeu enregistre des données, ajoute son script dans `supabase/migrations/` et lance-le dans Supabase.
+
+## L'Imposteur
+
+Script à lancer une fois dans Supabase : `supabase/migrations/20261009000000_imposteur.sql`.
+
+- Le salon montre qui a la page ouverte. N'importe qui lance la partie avec 3 à 6 présents.
+- Le mot n'est envoyé qu'aux téléphones des civils : l'imposteur ne peut pas le lire, même en fouillant.
+- Pour ajouter des mots : dans Supabase, **SQL Editor** →
+  `insert into public.imp_words (category, word) values ('Sport', 'Rugby'), ('Lieu', 'Gare');`
+- Pour remettre les scores à zéro : `delete from public.imp_games;`
+- Les téléphones se mettent à jour toutes les 2 à 3 secondes (et tout de suite quand Supabase Realtime est actif).
 
 ## Qui de nous ?
 

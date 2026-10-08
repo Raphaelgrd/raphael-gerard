@@ -10,6 +10,7 @@ export default defineConfig({
         hub: new URL('./index.html', import.meta.url).pathname,
         volley: new URL('./volley/index.html', import.meta.url).pathname,
         'qui-de-nous': new URL('./qui-de-nous/index.html', import.meta.url).pathname,
+        imposteur: new URL('./imposteur/index.html', import.meta.url).pathname,
       },
     },
   },

@@ -21,8 +21,17 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--b
 .eyebrow { font-size: .75rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; color: var(--accent) }
 h1 { font-family: var(--display); font-weight: 900; text-transform: uppercase; font-size: clamp(3rem, 16vw, 4.6rem); line-height: .9; margin: 4px 0 0; letter-spacing: .01em }
 h2 { font-family: var(--display); font-weight: 900; text-transform: uppercase; font-size: 1.3rem; margin: 0 }
-.members { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px }
-.members li { border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; font-size: .85rem; font-weight: 600 }
+[hidden] { display: none !important }
+.muted { color: var(--muted); margin: 0 }
+.who, .menu { display: flex; flex-direction: column; gap: 12px }
+.who-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px }
+.pick { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 700 1.05rem var(--body); cursor: pointer; text-align: left }
+.pick:hover { border-color: var(--c) }
+.pick:focus-visible, .link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.face { width: 46px; height: 46px; border-radius: 50%; background: var(--c); color: #fff; display: grid; place-items: center; font: 900 1.15rem var(--display); flex: none; box-shadow: inset 0 -4px 0 rgb(0 0 0 / .18) }
+.face.sm { width: 34px; height: 34px; font-size: .9rem }
+.hello { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 1.05rem }
+.link { margin-left: auto; background: none; border: 0; color: var(--muted); font: 600 .85rem var(--body); text-decoration: underline; cursor: pointer; padding: 4px }
 
 .games { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px }
 .game { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 14px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); color: inherit; text-decoration: none; transition: transform .12s ease, border-color .12s ease }
