@@ -6,6 +6,7 @@ La Mobut App regroupe les jeux de la bande sur une seule adresse :
 - `/qui-de-nous/` : Qui de nous ?
 - `/imposteur/` : L'Imposteur (en ligne)
 - `/toboggan/` : Toboggan, course de boules en 3D (solo contre l'ordinateur pour l'instant ; tracé dans `src/toboggan/track.ts`, réglages de la physique dans `src/toboggan/sim.ts`)
+- `/liars-bar/` : Liar's Bar, mode cartes, en ligne de 2 à 6 joueurs
 
 À la première ouverture, la Mobut App demande « Qui es-tu ? » et retient la réponse sur ce téléphone. Tous les jeux s'en servent (lien « Ce n'est pas moi » sur l'accueil pour changer). Les 6 joueurs sont définis une seule fois dans `src/shared/players.ts`.
 
@@ -16,6 +17,15 @@ Tous les jeux partagent le même projet Vercel (Root Directory `volley-notes`) e
 1. Crée `<jeu>/index.html` (copie celui d'un jeu existant) et son code dans `src/<jeu>/`.
 2. Ajoute une ligne dans `vite.config.ts` (`input`) et une dans `src/hub/games.ts` (la tuile du menu).
 3. Si le jeu enregistre des données, ajoute son script dans `supabase/migrations/` et lance-le dans Supabase.
+
+## Liar's Bar
+
+Script à lancer une fois dans Supabase : `supabase/migrations/20261010000000_liars_bar.sql`.
+
+- Le salon montre qui a la page ouverte ; n'importe qui lance la partie avec 2 à 6 présents.
+- Les mains ne sont envoyées qu'à leur propriétaire, les cartes posées ne sont montrées qu'après « Menteur ! », et la position des balles qu'à la fin.
+- Si quelqu'un ne joue plus, au bout de 40 secondes les autres peuvent jouer une carte à sa place.
+- Pour remettre les victoires à zéro : `delete from public.lb_games;`
 
 ## L'Imposteur
 

@@ -29,5 +29,12 @@ export const GAMES: { href: string; name: string; tagline: string; color: string
     color: '#1f8fe0',
     mark: '3D',
   },
+  {
+    href: '/liars-bar/',
+    name: "Liar's Bar",
+    tagline: 'Pose tes cartes, bluffe, crie « Menteur ! »… et prie pour que le revolver fasse clic.',
+    color: '#1f4a35',
+    mark: 'R?',
+  },
 ];
 

@@ -12,6 +12,7 @@ export default defineConfig({
         'qui-de-nous': new URL('./qui-de-nous/index.html', import.meta.url).pathname,
         imposteur: new URL('./imposteur/index.html', import.meta.url).pathname,
         toboggan: new URL('./toboggan/index.html', import.meta.url).pathname,
+        'liars-bar': new URL('./liars-bar/index.html', import.meta.url).pathname,
       },
     },
   },
