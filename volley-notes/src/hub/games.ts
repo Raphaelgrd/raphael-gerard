@@ -36,5 +36,12 @@ export const GAMES: { href: string; name: string; tagline: string; color: string
     color: '#1f4a35',
     mark: 'R?',
   },
+  {
+    href: '/mimic/',
+    name: 'Mimic Party',
+    tagline: 'Imite le son au micro : l’app note la ressemblance, les potes votent pour la meilleure imitation.',
+    color: '#ff5c8a',
+    mark: 'MIC',
+  },
 ];
 

@@ -13,6 +13,7 @@ export default defineConfig({
         imposteur: new URL('./imposteur/index.html', import.meta.url).pathname,
         toboggan: new URL('./toboggan/index.html', import.meta.url).pathname,
         'liars-bar': new URL('./liars-bar/index.html', import.meta.url).pathname,
+        mimic: new URL('./mimic/index.html', import.meta.url).pathname,
       },
     },
   },
