@@ -1,4 +1,6 @@
 -- Mimic Party : on imite un son de référence au micro ; l'app note la ressemblance et les autres votent.
+-- Déroulé d'une manche : chacun s'entraîne et envoie son imitation en secret (record), puis chacun passe
+-- au micro à tour de rôle devant tout le monde avec sa note révélée à la fin (stage), puis vote, puis résultats.
 --
 -- Fichiers audio dans le stockage Supabase (bucket public « mimic ») :
 --   sounds/…  la bibliothèque de sons de référence, alimentée depuis l'app ;
@@ -36,10 +38,12 @@ create table if not exists public.mm_lobby (
 
 create table if not exists public.mm_games (
   id               bigserial primary key,
-  status           text not null check (status in ('record', 'vote', 'results', 'ended')),
+  status           text not null,
   players          text[] not null,
   sounds           bigint[] not null,
   round            int not null default 1,
+  stage_order      text[],
+  stage_index      int not null default 0,
   phase_started_at timestamptz not null default now(),
   winner           text,
   aborted          boolean not null default false,
@@ -61,6 +65,7 @@ create table if not exists public.mm_takes (
   player     text not null,
   path       text not null,
   score      int not null check (score between 0 and 100),
+  duration   real not null default 0,
   created_at timestamptz not null default now(),
   primary key (game_id, round, player)
 );
@@ -72,6 +77,15 @@ create table if not exists public.mm_votes (
   target  text not null,
   primary key (game_id, round, voter)
 );
+
+-- Mises à niveau si une version précédente du script a déjà été lancée.
+alter table public.mm_games add column if not exists stage_order text[];
+alter table public.mm_games add column if not exists stage_index int not null default 0;
+alter table public.mm_takes add column if not exists duration real not null default 0;
+alter table public.mm_games drop constraint if exists mm_games_status_check;
+alter table public.mm_games add constraint mm_games_status_check check (status in ('record', 'stage', 'vote', 'results', 'ended'));
+drop function if exists public.mm_to_vote(bigint);
+drop function if exists public.mm_submit_take(uuid, int, text, int);
 
 alter table public.mm_sounds enable row level security;
 alter table public.mm_lobby enable row level security;
@@ -119,8 +133,8 @@ begin
 end;
 $$;
 
--- Fin de l'enregistrement : vote s'il y a au moins 2 imitations, sinon résultats directement.
-create or replace function public.mm_to_vote(p_game bigint)
+-- Fin de l'enregistrement : passage au micro dans un ordre tiré au hasard (ou résultats si personne n'a envoyé).
+create or replace function public.mm_to_stage(p_game bigint)
 returns void
 language plpgsql
 security definer
@@ -128,14 +142,23 @@ set search_path = public
 as $$
 declare
   g public.mm_games;
+  order_ text[];
 begin
   select * into g from public.mm_games where id = p_game;
+  select array_agg(player order by random()) into order_ from public.mm_takes where game_id = p_game and round = g.round;
   update public.mm_games
-  set status = case when (select count(*) from public.mm_takes where game_id = p_game and round = g.round) >= 2 then 'vote' else 'results' end,
-      phase_started_at = now()
+  set status = case when order_ is null then 'results' else 'stage' end,
+      stage_order = order_, stage_index = 0, phase_started_at = now()
   where id = p_game;
 end;
 $$;
+
+-- Durée d'un passage au micro : marche jusqu'au micro (2 s), l'imitation, puis la note (3 s).
+create or replace function public.mm_stage_length(p_duration real)
+returns interval
+language sql
+immutable
+as $$ select make_interval(secs => 2 + coalesce(p_duration, 0) + 3) $$;
 
 /* ---------- fonctions appelées par le site ---------- */
 
@@ -258,7 +281,7 @@ end;
 $$;
 
 -- Envoie son imitation pour la manche en cours (le fichier a déjà été envoyé dans takes/<partie>/).
-create or replace function public.mm_submit_take(p_token uuid, p_round int, p_path text, p_score int)
+create or replace function public.mm_submit_take(p_token uuid, p_round int, p_path text, p_score int, p_duration real)
 returns void
 language plpgsql
 security definer
@@ -279,15 +302,19 @@ begin
   if p_score is null or p_score < 0 or p_score > 100 then
     raise exception 'note invalide';
   end if;
-  insert into public.mm_takes (game_id, round, player, path, score) values (g.id, g.round, me, p_path, p_score)
-  on conflict (game_id, round, player) do update set path = excluded.path, score = excluded.score, created_at = now();
+  if p_duration is null or p_duration < 0 or p_duration > 20 then
+    raise exception 'durée invalide';
+  end if;
+  insert into public.mm_takes (game_id, round, player, path, score, duration) values (g.id, g.round, me, p_path, p_score, p_duration)
+  on conflict (game_id, round, player) do update
+    set path = excluded.path, score = excluded.score, duration = excluded.duration, created_at = now();
   if (select count(*) from public.mm_takes where game_id = g.id and round = g.round) = array_length(g.players, 1) then
-    perform public.mm_to_vote(g.id);
+    perform public.mm_to_stage(g.id);
   end if;
 end;
 $$;
 
--- Passe au vote sans attendre ceux qui n'ont pas enregistré (après 60 secondes).
+-- Passe au micro sans attendre ceux qui n'ont pas enregistré (après 60 secondes).
 create or replace function public.mm_close_record(p_token uuid)
 returns void
 language plpgsql
@@ -306,7 +333,38 @@ begin
   if now() - g.phase_started_at < interval '60 seconds' then
     raise exception 'laisse une minute à tout le monde';
   end if;
-  perform public.mm_to_vote(g.id);
+  perform public.mm_to_stage(g.id);
+end;
+$$;
+
+-- Passage suivant au micro, une fois le précédent terminé ; après le dernier, vote (ou résultats s'il n'y a qu'une imitation).
+create or replace function public.mm_stage_next(p_token uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  g public.mm_games;
+  me text;
+  dur real;
+begin
+  select l.me into me from public.mm_lock_current(p_token) l;
+  select * into g from public.mm_games order by id desc limit 1;
+  if g.status <> 'stage' then
+    return;
+  end if;
+  select duration into dur from public.mm_takes where game_id = g.id and round = g.round and player = g.stage_order[g.stage_index + 1];
+  if now() - g.phase_started_at < public.mm_stage_length(dur) then
+    return; -- passage pas encore fini (appel en double d'un autre téléphone)
+  end if;
+  if g.stage_index + 1 < array_length(g.stage_order, 1) then
+    update public.mm_games set stage_index = stage_index + 1, phase_started_at = now() where id = g.id;
+  else
+    update public.mm_games
+    set status = case when array_length(g.stage_order, 1) >= 2 then 'vote' else 'results' end, phase_started_at = now()
+    where id = g.id;
+  end if;
 end;
 $$;
 
@@ -438,14 +496,23 @@ as $$
         'round', g.round,
         'rounds', array_length(g.sounds, 1),
         'phaseStartedAt', g.phase_started_at,
+        'stageOrder', to_jsonb(g.stage_order),
+        'stageIndex', g.stage_index,
         'winner', g.winner,
         'aborted', g.aborted,
         'sound', (select jsonb_build_object('id', s.id, 'title', s.title, 'path', s.path, 'duration', s.duration)
                   from public.mm_sounds s where s.id = g.sounds[g.round]),
         'takes', coalesce((select jsonb_agg(jsonb_build_object(
                     'player', t.player,
-                    'path', case when g.status <> 'record' then t.path end,
-                    'score', case when g.status in ('results', 'ended') then t.score end,
+                    'duration', t.duration,
+                    -- Pendant les passages au micro : l'imitation se découvre à son tour, la note à la fin du passage.
+                    'path', case when g.status = 'record' then null
+                                 when g.status = 'stage' then case when array_position(g.stage_order, t.player) - 1 <= g.stage_index then t.path end
+                                 else t.path end,
+                    'score', case when g.status in ('vote', 'results', 'ended') then t.score
+                                  when g.status = 'stage' and (array_position(g.stage_order, t.player) - 1 < g.stage_index
+                                       or (array_position(g.stage_order, t.player) - 1 = g.stage_index
+                                           and now() - g.phase_started_at >= make_interval(secs => 2 + t.duration))) then t.score end,
                     'votes', case when g.status in ('results', 'ended') then
                                (select count(*) from public.mm_votes v where v.game_id = g.id and v.round = g.round and v.target = t.player) end,
                     'points', case when g.status in ('results', 'ended') then public.mm_points(g.id, g.round, t.player) end
@@ -460,13 +527,13 @@ as $$
 $$;
 
 revoke all on function public.mm_players(), public.mm_points(bigint, int, text), public.mm_lock_current(uuid),
-  public.mm_to_vote(bigint) from public, anon, authenticated;
+  public.mm_to_stage(bigint), public.mm_stage_length(real) from public, anon, authenticated;
 
 revoke all on function public.mm_heartbeat(uuid, text), public.mm_add_sound(text, text, text, real), public.mm_hide_sound(bigint),
-  public.mm_sounds_list(), public.mm_start(uuid, text[], int), public.mm_submit_take(uuid, int, text, int),
-  public.mm_close_record(uuid), public.mm_vote(uuid, text), public.mm_close_vote(uuid), public.mm_next(uuid),
+  public.mm_sounds_list(), public.mm_start(uuid, text[], int), public.mm_submit_take(uuid, int, text, int, real),
+  public.mm_close_record(uuid), public.mm_stage_next(uuid), public.mm_vote(uuid, text), public.mm_close_vote(uuid), public.mm_next(uuid),
   public.mm_abort(uuid), public.mm_state() from public;
 grant execute on function public.mm_heartbeat(uuid, text), public.mm_add_sound(text, text, text, real), public.mm_hide_sound(bigint),
-  public.mm_sounds_list(), public.mm_start(uuid, text[], int), public.mm_submit_take(uuid, int, text, int),
-  public.mm_close_record(uuid), public.mm_vote(uuid, text), public.mm_close_vote(uuid), public.mm_next(uuid),
+  public.mm_sounds_list(), public.mm_start(uuid, text[], int), public.mm_submit_take(uuid, int, text, int, real),
+  public.mm_close_record(uuid), public.mm_stage_next(uuid), public.mm_vote(uuid, text), public.mm_close_vote(uuid), public.mm_next(uuid),
   public.mm_abort(uuid), public.mm_state() to anon, authenticated;

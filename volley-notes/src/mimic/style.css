@@ -132,3 +132,47 @@ button:focus-visible, input:focus-visible, .file:focus-within { outline: 2px sol
 
 .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 600; font-size: .92rem; max-width: calc(100% - 32px); z-index: 30 }
 @media (prefers-reduced-motion: no-preference) { .rec-btn.on { animation: pulse 1s ease-in-out infinite } @keyframes pulse { 50% { box-shadow: 0 0 0 14px rgb(255 92 138 / .15) } } }
+
+/* pixel characters */
+.sprite { display: block; width: 100%; height: 100%; image-rendering: pixelated }
+.face { overflow: hidden; padding: 0; align-items: end; box-shadow: inset 0 -3px 0 rgb(0 0 0 / .25) }
+.face .sprite { transform: translateY(6%) scale(1.08) }
+
+/* the stage */
+.stage { position: relative; height: 330px; border-radius: 18px; overflow: hidden; border: 1px solid var(--line);
+  background: linear-gradient(#2a1440, #1a0c2a 62%, #3b2316 62%, #2a180e) }
+.curtain { position: absolute; top: 0; bottom: 38%; width: 22%; background: repeating-linear-gradient(90deg, #8f1430 0 10px, #b71c3c 10px 20px); box-shadow: 0 6px 12px rgb(0 0 0 / .4) }
+.curtain.l { left: 0; border-bottom-right-radius: 60% 30% }
+.curtain.r { right: 0; border-bottom-left-radius: 60% 30% }
+.spot { position: absolute; left: 50%; top: -10%; width: 70%; height: 90%; transform: translateX(-50%);
+  background: radial-gradient(ellipse at 50% 100%, rgb(255 236 170 / .45), transparent 65%); clip-path: polygon(40% 0, 60% 0, 100% 100%, 0 100%); opacity: 0; transition: opacity .4s }
+.spot.on { opacity: 1 }
+.performer { position: absolute; bottom: 36%; left: 50%; width: 120px; height: 150px; transform: translateX(-50%) }
+.performer .who { position: absolute; bottom: 0; width: 120px; height: 120px }
+.performer .mic { position: absolute; bottom: 0; left: -4px; width: 6px; height: 74px; background: #8d9098; z-index: 2 }
+.performer .mic::before { content: ""; position: absolute; bottom: -4px; left: 50%; width: 40px; height: 6px; background: #5b5e66; transform: translateX(-50%); border-radius: 3px }
+.performer .mic i { position: absolute; top: -16px; left: 2px; width: 18px; height: 22px; background: repeating-linear-gradient(#2d2f35 0 3px, #4c4f57 3px 5px); border-radius: 9px; transform: rotate(35deg) }
+.notes { position: absolute; top: -6px; right: -18px; color: var(--gold); font-size: 1.4rem; display: flex; flex-direction: column }
+.audience { position: absolute; left: 0; right: 0; bottom: 6px; display: flex; justify-content: center; gap: 4px }
+.seat-sprite { width: 58px; height: 58px; filter: brightness(.55) }
+.scorecard { position: absolute; top: 14px; right: 14px; background: var(--gold); color: #2a1a00; border-radius: 14px; padding: 8px 14px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 8px 20px rgb(0 0 0 / .4); transform: rotate(4deg) }
+.scorecard .num { font: 900 3.2rem/1 var(--display) }
+.scorecard .verdict { font-weight: 800; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em }
+.stage-info .lineup { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px }
+.lineup li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px }
+.lineup li.now { background: var(--surface-2) }
+.lineup .sname { flex: 1; font-weight: 600 }
+.lineup b { font: 900 1.2rem var(--display); color: var(--gold) }
+
+@media (prefers-reduced-motion: no-preference) {
+  .performer.step-0 .who { animation: walkin 2s steps(8) both }
+  @keyframes walkin { from { transform: translateX(-190px) } to { transform: none } }
+  .performer.step-0 .who .sprite, .performer.step-1 .who .sprite { animation: bob .4s steps(2) infinite }
+  @keyframes bob { 50% { transform: translateY(-4px) } }
+  .notes i { animation: float 1.2s ease-out infinite; opacity: 0 }
+  .notes i:nth-child(2) { animation-delay: .4s }
+  .notes i:nth-child(3) { animation-delay: .8s }
+  @keyframes float { 0% { opacity: 0; transform: translate(0, 10px) } 30% { opacity: 1 } 100% { opacity: 0; transform: translate(12px, -30px) } }
+  .scorecard { animation: drop .5s cubic-bezier(.2, 1.6, .4, 1) both }
+  @keyframes drop { from { transform: translateY(-120px) rotate(-20deg); opacity: 0 } to { transform: rotate(4deg); opacity: 1 } }
+}

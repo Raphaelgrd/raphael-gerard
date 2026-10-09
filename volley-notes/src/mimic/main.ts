@@ -6,6 +6,7 @@ import './style.css';
 import { supabase } from '../shared/supabase';
 import { PLAYERS, playerName } from '../shared/players';
 import { deviceToken, getMe, setMe } from '../shared/identity';
+import { sprite } from '../shared/sprites';
 import { analyze, envelope, similarity, type Frame } from './audio';
 import { decodeMono16k, EXT, isPlaying, onPlaybackChange, play, record, recordingMime, referenceFrames, stopPlayback, type Recording } from './sound';
 
@@ -18,6 +19,7 @@ interface Sound {
 }
 interface Take {
   player: string;
+  duration: number;
   path: string | null;
   score: number | null;
   votes: number | null;
@@ -25,7 +27,9 @@ interface Take {
 }
 interface Game {
   id: number;
-  status: 'record' | 'vote' | 'results' | 'ended';
+  status: 'record' | 'stage' | 'vote' | 'results' | 'ended';
+  stageOrder: string[] | null;
+  stageIndex: number;
   players: string[];
   round: number;
   rounds: number;
@@ -50,6 +54,9 @@ const TOKEN = deviceToken();
 const BUCKET = 'mimic';
 const CLOSE_RECORD_AFTER = 60;
 const RESULTS_NEXT = 10;
+// Passage au micro : marche jusqu'au micro, l'imitation, puis la note (mêmes durées que dans le script SQL).
+const WALK = 2;
+const HOLD = 3;
 const MAX_SOUND = 15;
 
 type RecState = 'idle' | 'recording' | 'scoring' | 'ready' | 'sending' | 'sent';
@@ -73,7 +80,10 @@ const S = {
   recFor: '', // `${game}:${round}`
   rec: 'idle' as RecState,
   recording: null as Recording | null,
-  take: null as { blob: Blob; url: string; frames: Frame[]; score: number } | null,
+  take: null as { blob: Blob; url: string; frames: Frame[]; score: number; duration: number } | null,
+  stagePlayed: '', // passage dont l'imitation a déjà été lancée sur ce téléphone
+  stageBlocked: false, // le navigateur a refusé la lecture automatique
+  stageNextTry: 0,
   refEnv: [] as number[],
   refReady: false,
   refError: false,
@@ -88,7 +98,7 @@ const player = (id: string) => PLAYERS.find((p) => p.id === id)!;
 const name = (id: string | null | undefined) => esc(id ? playerName(id) : '');
 const face = (id: string, cls = '') => {
   const p = player(id);
-  return p ? `<span class="face ${cls}" style="--c:${p.color}" aria-hidden="true">${esc(p.short)}</span>` : '';
+  return p ? `<span class="face ${cls}" style="--c:${p.color}" aria-hidden="true">${sprite(id)}</span>` : '';
 };
 const plural = (n: number, w: string) => `${n} ${w}${n > 1 ? 's' : ''}`;
 const publicUrl = (path: string) => supabase!.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
@@ -194,6 +204,8 @@ function render(force = false) {
     st && { ...st, now: undefined },
     g && g.status === 'record' && since(g.phaseStartedAt) > CLOSE_RECORD_AFTER,
     g && g.status === 'vote' && since(g.phaseStartedAt) > 45,
+    g && g.status === 'stage' ? stageStep(g) : null,
+    S.stageBlocked,
   ]);
   if (!force && sig === S.lastSig) return;
   S.lastSig = sig;
@@ -318,12 +330,14 @@ function renderGame(g: Game) {
   let body = '';
   if (g.status === 'record') {
     const sent = g.takes.map((t) => t.player);
-    const waiting = `<p class="muted small center">${sent.length} / ${n} ont envoyé${sent.length ? ` : ${sent.map((p) => name(p)).join(', ')}` : ''}</p>`;
+    const waiting = `<p class="muted small center">Entraîne-toi dans ton coin : chacun passera ensuite au micro devant tout le monde.</p><p class="muted small center">${sent.length} / ${n} ont envoyé${sent.length ? ` : ${sent.map((p) => name(p)).join(', ')}` : ''}</p>`;
     const canClose = seated && since(g.phaseStartedAt) > CLOSE_RECORD_AFTER && sent.length < n;
     if (!seated) body = `<p class="center muted">Partie en cours : tu regardes.</p>${waiting}`;
     else if (S.rec === 'sent') body = `<section class="panel center"><h2>Envoyé !</h2><p class="muted">On attend les autres…</p></section>${waiting}`;
     else body = renderRecorder() + waiting;
     if (canClose) body += `<button class="btn ghost" data-act="close-record">Passer au vote sans attendre</button>`;
+  } else if (g.status === 'stage') {
+    body = renderStage(g);
   } else if (g.status === 'vote') {
     const key = `${g.id}:${g.round}`;
     const mine = S.myVote?.key === key ? S.myVote.target : null;
@@ -359,6 +373,86 @@ function renderGame(g: Game) {
   return `<div class="stack">${head}${refCard}${body}</div>`;
 }
 
+/* ---------- passage au micro ---------- */
+function currentPerformer(g: Game) {
+  const id = g.stageOrder?.[g.stageIndex] ?? null;
+  return { id, take: g.takes.find((t) => t.player === id) ?? null };
+}
+/** 0 : il marche jusqu'au micro, 1 : il imite, 2 : la note tombe. */
+function stageStep(g: Game) {
+  const { take } = currentPerformer(g);
+  const t = since(g.phaseStartedAt);
+  return t < WALK ? 0 : t < WALK + (take?.duration ?? 0) ? 1 : 2;
+}
+
+function renderStage(g: Game) {
+  const { id, take } = currentPerformer(g);
+  if (!id || !take) return '';
+  const step = stageStep(g);
+  const order = g.stageOrder ?? [];
+  const audience = g.players.filter((p) => p !== id);
+  const score = take.score;
+  const verdict = score === null ? '' : score >= 80 ? 'Bluffant !' : score >= 60 ? 'Pas mal du tout' : score >= 35 ? 'On reconnaît… à peu près' : 'Aïe.';
+  return `<section class="stage">
+      <div class="curtain l"></div><div class="curtain r"></div>
+      <div class="spot ${step >= 1 ? 'on' : ''}"></div>
+      <div class="performer step-${step}">
+        <div class="mic"><i></i></div>
+        <div class="who">${sprite(id, 'big', playerName(id))}</div>
+        ${step === 1 ? '<div class="notes"><i>♪</i><i>♫</i><i>♪</i></div>' : ''}
+      </div>
+      ${step === 2 && score !== null ? `<div class="scorecard"><span class="num" style="--to:${score}">${score}</span><span class="small">/ 100</span><span class="verdict">${verdict}</span></div>` : ''}
+      <div class="audience">${audience.map((p) => `<span class="seat-sprite">${sprite(p)}</span>`).join('')}</div>
+    </section>
+    <section class="panel stage-info">
+      <div class="row between"><h2>${name(id)} au micro</h2><span class="muted small">${g.stageIndex + 1} / ${order.length}</span></div>
+      ${S.stageBlocked && step >= 1 ? `<button class="btn" data-act="stage-play">Toucher pour écouter</button>` : ''}
+      <ol class="lineup">${order
+        .map((p, i) => {
+          const t = g.takes.find((x) => x.player === p);
+          const done = i < g.stageIndex || (i === g.stageIndex && step === 2);
+          return `<li class="${i === g.stageIndex ? 'now' : ''}">${face(p, 'sm')}<span class="sname">${name(p)}</span><b>${done && t?.score !== null && t?.score !== undefined ? t.score : i === g.stageIndex ? 'au micro' : '…'}</b></li>`;
+        })
+        .join('')}</ol>
+    </section>`;
+}
+
+/** Lance l'imitation du joueur au micro au bon moment, une seule fois par passage. */
+function driveStage() {
+  const g = S.state?.game;
+  if (!g || g.status !== 'stage') return;
+  const { id, take } = currentPerformer(g);
+  if (!id || !take?.path) return;
+  const key = `${g.id}:${g.round}:${g.stageIndex}`;
+  const t = since(g.phaseStartedAt);
+  if (t >= WALK && t < WALK + take.duration + HOLD && S.stagePlayed !== key) {
+    S.stagePlayed = key;
+    S.stageBlocked = false;
+    playStage(key, publicUrl(take.path));
+  }
+  // La note est calculée côté serveur : on recharge l'état juste quand elle doit tomber.
+  if (t >= WALK + take.duration && take.score === null && Date.now() - S.stageNextTry > 800) {
+    S.stageNextTry = Date.now();
+    refresh();
+  }
+  const seated = g.players.includes(S.me ?? '');
+  if (seated && t > WALK + take.duration + HOLD + 0.3 && !S.busy && Date.now() - S.nextTry > 1500) {
+    S.nextTry = Date.now();
+    call('mm_stage_next', { p_token: TOKEN }, true);
+  }
+}
+
+function playStage(key: string, url: string) {
+  play('stage-' + key, url);
+  // Si le navigateur bloque la lecture sans geste, on propose un bouton.
+  setTimeout(() => {
+    if (!isPlaying('stage-' + key) && S.stagePlayed === key) {
+      S.stageBlocked = true;
+      render(true);
+    }
+  }, 600);
+}
+
 function renderRecorder() {
   const t = S.take;
   if (S.rec === 'recording') {
@@ -372,8 +466,7 @@ function renderRecorder() {
   if ((S.rec === 'ready' || S.rec === 'sending') && t) {
     return `<section class="recorder">
       <div class="compare">${bars(S.refEnv, 'ref-bars')}${bars(envelope(t.frames, 48), 'take-bars')}</div>
-      <div class="score"><span class="num">${t.score}</span><span class="muted">/ 100</span></div>
-      <p class="muted small">${t.score >= 80 ? 'Bluffant.' : t.score >= 60 ? 'Pas mal du tout.' : t.score >= 35 ? 'On reconnaît… à peu près.' : 'Hmm. Réessaie ?'}</p>
+      <p class="muted small">Ta note restera secrète jusqu'à ton passage au micro. Réécoute-toi, recommence autant que tu veux, puis envoie ta meilleure version.</p>
       <div class="row center">
         <button class="btn ghost" data-act="take-mine">${isPlaying('mine') ? 'Pause' : 'Me réécouter'}</button>
         <button class="btn ghost" data-act="rec-again" ${S.rec === 'sending' ? 'disabled' : ''}>Recommencer</button>
@@ -409,7 +502,8 @@ async function startTake() {
     const { samples } = await decodeMono16k(await blob.arrayBuffer());
     const frames = analyze(samples);
     if (S.take) URL.revokeObjectURL(S.take.url);
-    S.take = { blob, url: URL.createObjectURL(blob), frames, score: similarity(ref, frames) };
+    const duration = Math.min(20, frames.length * 0.02 + 0.3);
+    S.take = { blob, url: URL.createObjectURL(blob), frames, score: similarity(ref, frames), duration };
     S.rec = 'ready';
   } catch (e) {
     S.recording = null;
@@ -433,7 +527,7 @@ async function sendTake() {
     render(true);
     return;
   }
-  if (await call('mm_submit_take', { p_token: TOKEN, p_round: g.round, p_path: path, p_score: S.take.score })) S.rec = 'sent';
+  if (await call('mm_submit_take', { p_token: TOKEN, p_round: g.round, p_path: path, p_score: S.take.score, p_duration: S.take.duration })) S.rec = 'sent';
   else S.rec = 'ready';
   render(true);
 }
@@ -562,6 +656,15 @@ view.addEventListener('click', async (e) => {
     case 'send':
       sendTake();
       break;
+    case 'stage-play': {
+      const g2 = S.state?.game;
+      const cur = g2 && currentPerformer(g2);
+      if (g2 && cur?.take?.path) {
+        S.stageBlocked = false;
+        play(`stage-${g2.id}:${g2.round}:${g2.stageIndex}`, publicUrl(cur.take.path));
+      }
+      break;
+    }
     case 'close-record':
       await call('mm_close_record', { p_token: TOKEN });
       break;
@@ -651,13 +754,14 @@ if (supabase) {
   setInterval(() => {
     const g = S.state?.game;
     if (!g) return;
+    driveStage();
     render();
     const seated = g.players.includes(S.me ?? '');
     if (g.status === 'results' && seated && since(g.phaseStartedAt) > RESULTS_NEXT && !S.busy && Date.now() - S.nextTry > 3000) {
       S.nextTry = Date.now();
       call('mm_next', { p_token: TOKEN }, true);
     }
-  }, 500);
+  }, 250);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') heartbeat().then(refresh);
   });
