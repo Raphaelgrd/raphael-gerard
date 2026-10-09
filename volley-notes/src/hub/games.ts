@@ -9,6 +9,13 @@ export const GAMES: { href: string; name: string; tagline: string; color: string
     mark: '10',
   },
   {
+    href: '/mimic/',
+    name: 'Mimic Party',
+    tagline: 'Imite le son au micro : l’app note la ressemblance, les potes votent pour la meilleure imitation.',
+    color: '#ff5c8a',
+    mark: 'MIC',
+  },
+  {
     href: '/qui-de-nous/',
     name: 'Qui de nous ?',
     tagline: 'Une question, six têtes : classe-les du 1er au 6e. Le groupe rend son verdict.',
@@ -35,13 +42,6 @@ export const GAMES: { href: string; name: string; tagline: string; color: string
     tagline: 'Pose tes cartes, bluffe, crie « Menteur ! »… et prie pour que le revolver fasse clic.',
     color: '#1f4a35',
     mark: 'R?',
-  },
-  {
-    href: '/mimic/',
-    name: 'Mimic Party',
-    tagline: 'Imite le son au micro : l’app note la ressemblance, les potes votent pour la meilleure imitation.',
-    color: '#ff5c8a',
-    mark: 'MIC',
   },
 ];
 
