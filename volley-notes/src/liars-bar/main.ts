@@ -164,6 +164,7 @@ function render(force = false) {
     st && { ...st, now: undefined },
     g && (g.status === 'reveal' || g.status === 'ended') && g.reveal ? revealStage(g) : null,
     g && g.status === 'play' && since(g.turnStartedAt) > FORCE_AFTER,
+    g && justEnded(g),
   ]);
   if (!force && sig === S.lastSig) return;
   S.lastSig = sig;
@@ -340,6 +341,7 @@ function renderReveal(g: Game) {
   return `<div class="reveal-wrap">
     <section class="reveal">
       <span class="eyebrow">${name(r.caller)} accuse ${name(r.accused)}</span>
+      <p class="muted small">Table des ${RANK_PLURAL[r.tableRank]} : le Joker compte aussi</p>
       <div class="revealed">${r.cards.map((c, i) => cardFace(c, `flip ${c === r.tableRank || c === 'J' ? 'ok' : 'lie'}`, `--d:${i}`)).join('')}</div>
       <p class="verdict ${r.liar ? 'lie' : 'ok'}">${verdict}</p>
       ${shot}
