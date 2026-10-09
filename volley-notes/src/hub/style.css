@@ -45,3 +45,8 @@ h2 { font-family: var(--display); font-weight: 900; text-transform: uppercase; f
 .go { font-size: 1.4rem; color: var(--muted) }
 .soon { border: 1px dashed var(--line); border-radius: 16px; padding: 18px; text-align: center; color: var(--muted); font-weight: 600; font-size: .9rem }
 @media (prefers-reduced-motion: reduce) { .game { transition: none } }
+
+/* personnages en pixel art */
+.face { overflow: hidden; align-items: end }
+.face .sprite { display: block; width: 100%; height: 100%; image-rendering: pixelated; transform: translateY(6%) scale(1.08) }
+.pick .face { width: 56px; height: 56px }

@@ -7,8 +7,9 @@ La Mobut App regroupe les jeux de la bande sur une seule adresse :
 - `/imposteur/` : L'Imposteur (en ligne)
 - `/toboggan/` : Toboggan, course de boules en 3D (solo contre l'ordinateur pour l'instant ; tracé dans `src/toboggan/track.ts`, réglages de la physique dans `src/toboggan/sim.ts`)
 - `/liars-bar/` : Liar's Bar, mode cartes, en ligne de 2 à 6 joueurs
+- `/mimic/` : Mimic Party, imitation de sons au micro, en ligne de 2 à 6 joueurs
 
-À la première ouverture, la Mobut App demande « Qui es-tu ? » et retient la réponse sur ce téléphone. Tous les jeux s'en servent (lien « Ce n'est pas moi » sur l'accueil pour changer). Les 6 joueurs sont définis une seule fois dans `src/shared/players.ts`.
+À la première ouverture, la Mobut App demande « Qui es-tu ? » et retient la réponse sur ce téléphone. Tous les jeux s'en servent (lien « Ce n'est pas moi » sur l'accueil pour changer). Les 6 joueurs sont définis une seule fois dans `src/shared/players.ts`. Leurs personnages en pixel art sont dans `src/shared/sprites.ts`.
 
 Tous les jeux partagent le même projet Vercel (Root Directory `volley-notes`) et le même projet Supabase.
 
@@ -17,6 +18,16 @@ Tous les jeux partagent le même projet Vercel (Root Directory `volley-notes`) e
 1. Crée `<jeu>/index.html` (copie celui d'un jeu existant) et son code dans `src/<jeu>/`.
 2. Ajoute une ligne dans `vite.config.ts` (`input`) et une dans `src/hub/games.ts` (la tuile du menu).
 3. Si le jeu enregistre des données, ajoute son script dans `supabase/migrations/` et lance-le dans Supabase.
+
+## Mimic Party
+
+Script à lancer une fois dans Supabase : `supabase/migrations/20261011000000_mimic.sql`. Il crée aussi l'espace de stockage des fichiers audio (bucket public `mimic`, 3 Mo maximum par fichier, uniquement de l'audio).
+
+- Déroulé d'une manche : chacun s'entraîne en secret et envoie sa meilleure imitation, puis chacun passe au micro sur la scène à tour de rôle (son personnage, son imitation jouée sur tous les téléphones, sa note révélée à la fin), puis vote.
+- La bibliothèque de sons se remplit depuis l'onglet **Sons** du jeu (enregistrement au micro ou fichier audio, 15 secondes maximum).
+- Le micro ne marche qu'en HTTPS (c'est le cas sur Vercel) ; le navigateur demande l'autorisation la première fois.
+- La note de l'app compare le rythme, la mélodie et le volume (`src/mimic/audio.ts`) ; elle est calculée sur le téléphone du joueur.
+- Pour vider le stockage : Supabase → **Storage** → `mimic`.
 
 ## Liar's Bar
 
